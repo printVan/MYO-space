@@ -1,0 +1,220 @@
+/**
+ * 全局 GitHub 风格样式（§5）
+ * 深浅双主题，通过 CSS 变量驱动
+ * touch: 2026-09-08 T3（验证配置独立生效）
+ */
+
+:root,
+[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-subtle: #f6f8fa;
+  --text: #1f2328;
+  --text-secondary: #59636e;
+  --text-muted: #8d959e;
+  --border: #d1d9e0;
+  --border-muted: #eaeef2;
+  --code-bg: #f6f8fa;
+  --accent: #0969da;
+  --accent-muted: #ddf4ff;
+  --hover: #f3f4f6;
+  --danger: #cf222e;
+  --success: #1a7f37;
+  /* GitHub 官网招牌深色顶栏 */
+  --header-bg: #24292f;
+  --header-text: #ffffff;
+  --header-muted: #8b949e;
+  --header-input-bg: #1f2429;
+  --header-input-border: #424a53;
+  --shadow: none;
+  --overlay: rgba(31, 35, 40, 0.5);
+}
+
+[data-theme='dark'] {
+  /* 柔和墨绿主题：深墨绿带灰调、不刺眼，面板/边框逐层提亮形成层次 */
+  --bg: #14231b;
+  --bg-subtle: #1b2f24;
+  --text: #e3ede7;
+  --text-secondary: #9db8aa;
+  --text-muted: #7d998b;
+  --border: #2c483a;
+  --border-muted: #20352b;
+  --code-bg: #182a21;
+  --accent: #4ec48d;
+  --accent-muted: #163f2d;
+  --hover: #20362b;
+  --danger: #ff8b7a;
+  --success: #3fb950;
+  /* 顶栏：墨绿渐变，提亮一档，柔和有层次 */
+  --header-bg: linear-gradient(90deg, #1e372a 0%, #2a4f38 100%);
+  --header-text: #ffffff;
+  --header-muted: #9db8aa;
+  --header-input-bg: #15271e;
+  --header-input-border: #31513f;
+  --shadow: none;
+  --overlay: rgba(0, 0, 0, 0.45);
+}
+
+page,
+html,
+body,
+#app,
+.taro_router,
+.taro_page {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
+
+/* GitHub 风格细分割线 / 克制边框 / 无大阴影 */
+.gh-border {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.gh-link {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+.gh-link:hover {
+  text-decoration: underline;
+}
+
+.gh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.gh-btn:hover {
+  background: var(--hover);
+}
+.gh-btn.primary {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: rgba(27, 31, 36, 0.15);
+}
+.gh-btn.primary:hover {
+  background: #0860ca;
+}
+.gh-btn.danger {
+  color: var(--danger);
+}
+.gh-btn.sm {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.gh-input,
+.gh-textarea {
+  padding: 5px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+  width: 100%;
+}
+.gh-input:focus,
+.gh-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+/* 顶部导航栏（GitHub 官网深色 header） */
+.gh-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 0 20px;
+  min-height: 56px;
+  height: auto;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.gh-header .gh-link {
+  color: var(--header-text);
+}
+.gh-header .gh-link:hover {
+  color: var(--header-muted);
+  text-decoration: none;
+}
+/* header 内的深色搜索框 */
+.gh-header .gh-input {
+  background: var(--header-input-bg);
+  border-color: var(--header-input-border);
+  color: var(--header-text);
+}
+.gh-header .gh-input::placeholder {
+  color: var(--header-muted);
+}
+.gh-header .gh-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.3);
+}
+
+.gh-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  height: 22px;
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--accent-muted);
+  border-radius: 12px;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* markdown-body 覆盖主题色 */
+.markdown-body {
+  background: transparent !important;
+  color: var(--text) !important;
+  font-family: inherit;
+}
+.markdown-body pre {
+  background: var(--code-bg) !important;
+}
+.markdown-body code {
+  background: var(--code-bg) !important;
+}
+.markdown-body .highlight pre,
+.markdown-body pre {
+  background-color: var(--code-bg) !important;
+}
+[data-theme='dark'] .markdown-body {
+  color-scheme: dark;
+}

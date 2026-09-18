@@ -1,0 +1,42 @@
+# 依赖
+node_modules/
+.swc/
+
+# 构建产物
+dist/
+build/
+coverage/
+
+# 缓存目录
+.wrangler/
+.taro/
+.cache/
+
+# 日志
+*.log
+
+# 本地上传目录
+server/uploads/
+
+# 文档与 QA 记录（不入库，仅代码入库）
+docs/
+qa-results/
+
+# 敏感凭据（绝不入库）
+server/.env
+.env
+.env.*
+!.env.example
+
+# IDE / 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+
+# 临时文件
+*.tmp
+*.bak
+*~
+*.tsbuildinfo

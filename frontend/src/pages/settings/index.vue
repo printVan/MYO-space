@@ -80,6 +80,18 @@
       </view>
     </view>
     <MobileLayoutToggle />
+
+    <!-- 自定义确认弹窗 -->
+    <view v-if="confirmOpen" class="modal-mask" @click.self="confirmOpen = false">
+      <view class="modal confirm-modal">
+        <view class="modal-title">{{ confirmTitle }}</view>
+        <view class="modal-content">{{ confirmContent }}</view>
+        <view class="confirm-actions">
+          <view class="confirm-btn" @click="confirmOpen = false">取消</view>
+          <view class="confirm-btn danger" @click="doConfirm">{{ confirmOkText }}</view>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -143,28 +155,32 @@ function goHome() {
   Taro.reLaunch({ url: '/pages/blog/index' })
 }
 
+const confirmOpen = ref(false)
+const confirmTitle = ref('')
+const confirmContent = ref('')
+const confirmOkText = ref('确定')
+
 function onClear() {
-  Taro.showModal({
-    title: '清空本地数据',
-    content: '将删除全部项目、笔记、快照，此操作不可恢复。确定继续？',
-    confirmText: '清空',
-    confirmColor: '#cf222e'
-  }).then(async (res) => {
-    if (res.confirm) {
-      await db.transaction('rw', db.projects, db.folders, db.notes, db.snapshots, db.annotations, db.preferences, async () => {
-        await Promise.all([
-          db.projects.clear(),
-          db.folders.clear(),
-          db.notes.clear(),
-          db.snapshots.clear(),
-          db.annotations.clear(),
-          db.preferences.clear()
-        ])
-      })
-      await loadStats()
-      Taro.showToast({ title: '已清空', icon: 'success' })
-    }
+  confirmTitle.value = '清空本地数据'
+  confirmContent.value = '将删除全部项目、笔记、快照，此操作不可恢复。确定继续？'
+  confirmOkText.value = '清空'
+  confirmOpen.value = true
+}
+
+async function doConfirm() {
+  confirmOpen.value = false
+  await db.transaction('rw', db.projects, db.folders, db.notes, db.snapshots, db.annotations, db.preferences, async () => {
+    await Promise.all([
+      db.projects.clear(),
+      db.folders.clear(),
+      db.notes.clear(),
+      db.snapshots.clear(),
+      db.annotations.clear(),
+      db.preferences.clear()
+    ])
   })
+  await loadStats()
+  Taro.showToast({ title: '已清空', icon: 'success' })
 }
 
 onMounted(() => {
@@ -290,5 +306,55 @@ onUnmounted(() => {
 .switch-label {
   font-size: 13px;
   color: var(--text-secondary);
+}
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 320px;
+  max-width: 90vw;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+}
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+.modal-content {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.confirm-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text);
+}
+.confirm-btn:hover {
+  background: var(--bg-subtle);
+}
+.confirm-btn.danger {
+  color: #cf222e;
+}
+.confirm-btn.danger:hover {
+  background: rgba(207, 34, 46, 0.08);
 }
 </style>

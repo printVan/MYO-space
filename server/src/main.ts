@@ -25,7 +25,12 @@ async function bootstrap() {
       // 无 Origin（curl/服务端调用）放行；带 Origin 的必须命中白名单，否则不返回 CORS 头（浏览器侧拦截）
       if (!origin) return callback(null, true);
       // 放行 Cloudflare Pages 全部部署子域（生产 / preview / 随机 hash 子域）
-      if (corsOrigins.includes(origin) || /^https:\/\/([a-z0-9-]+\.)?myblog-af7\.pages\.dev$/.test(origin)) {
+      // 放行局域网 IP（开发阶段手机/其他设备访问）
+      if (
+        corsOrigins.includes(origin) ||
+        /^https:\/\/([a-z0-9-]+\.)?myblog-af7\.pages\.dev$/.test(origin) ||
+        /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+):\d+$/.test(origin)
+      ) {
         return callback(null, true);
       }
       return callback(null, false);

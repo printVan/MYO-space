@@ -57,7 +57,6 @@
         </view>
       </view>
     </view>
-    <MobileLayoutToggle />
   </view>
 </template>
 
@@ -70,7 +69,6 @@ import { getProject } from '@/services/projects'
 import type { Project } from '@/types/models'
 import { relativeTimeStr } from '@/utils/time'
 import FileTree from '@/components/FileTree'
-import MobileLayoutToggle from '@/components/MobileLayoutToggle'
 import { bindAutoMobile } from '@/utils/mobile'
 
 /**

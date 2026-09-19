@@ -4,6 +4,7 @@ export default defineAppConfig({
     'pages/blog/index',
     'pages/blog/project',
     'pages/blog/note',
+    'pages/blog/projects',
     'pages/settings/index'
   ],
   window: {

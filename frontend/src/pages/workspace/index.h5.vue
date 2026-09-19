@@ -36,11 +36,16 @@
         :style="{ width: widths.sidebar + 'px' }"
       >
         <view class="panel-header">
-          <text class="panel-title">项目</text>
+          <text class="panel-title" title="项目">
+            <BrandIcon :size="16" color="#2d6a4f" class="title-icon" />
+            <text class="title-text">项目</text>
+          </text>
           <view class="panel-tools">
-            <view class="gh-btn sm" @click="openNewProjectModal">新建</view>
+            <view class="gh-btn sm" @click="openNewProjectModal" title="新建项目">
+              <GhIcon name="plus" :size="14" />
+            </view>
             <view class="panel-collapse" @click="projectStore.toggleSidebar()" title="收起项目栏">
-              <GhIcon name="chevronLeft" :size="14" />
+              <GhIcon name="sidebarCollapse" :size="14" />
             </view>
           </view>
         </view>
@@ -53,19 +58,21 @@
             @click="switchProject(p.id)"
           >
             <text class="project-icon">
-              <GhIcon name="repo" :size="14" />
+              <GhIcon name="briefcase" :size="13" color="#2d6a4f" />
             </text>
             <text class="project-name-item">{{ p.name }}</text>
-            <text class="project-vis">{{ p.visibility === 'public' ? '公开' : '私密' }}</text>
-            <view class="row-menu" @click.stop>
-              <text class="gh-link" @click="toggleProjectVisibility(p)">{{ p.visibility === 'public' ? '设为私密' : '设为公开' }}</text>
-              <text class="gh-link danger" @click="confirmDeleteProject(p)">删除</text>
-            </view>
           </view>
         </scroll-view>
         <view class="panel-header tree-title">
-          <text class="panel-title">目录树</text>
-          <view class="gh-btn sm" @click="projectStore.enterFolder(null)">根目录</view>
+          <text class="panel-title" title="目录">
+            <GhIcon name="listTree" :size="14" class="title-icon" />
+            <text class="title-text">目录</text>
+          </text>
+          <view class="tree-tools">
+            <view class="gh-btn sm" @click="openNewFolderModal" title="新建目录"><GhIcon name="folder" :size="13" /></view>
+            <view class="gh-btn sm primary" @click="openNewNoteModal" title="新建笔记"><GhIcon name="fileText" :size="13" /></view>
+            <view class="gh-btn sm" @click="showExportMenu" title="导出"><GhIcon name="download" :size="13" /></view>
+          </view>
         </view>
         <scroll-view class="tree-area" scroll-y>
           <FileTree
@@ -79,70 +86,11 @@
         </scroll-view>
         <view class="resizer" @mousedown.prevent="startResize('sidebar', $event)"></view>
       </view>
-      <view v-else-if="!editorMaximized" class="sidebar-folded" @click="projectStore.toggleSidebar()" title="展开项目栏">▸</view>
-
-      <!-- 第二栏：当前项目文件列表抽屉（§5.5） -->
-      <view
-        v-if="!editorMaximized && !projectStore.filePanelCollapsed"
-        class="file-panel"
-        :class="{ 'm-drawer-open': mobileMode && activeDrawer === 'file' }"
-        :style="{ width: widths.files + 'px' }"
-      >
-        <view class="panel-header">
-          <text class="panel-title">{{ breadcrumbText }}</text>
-          <view class="file-actions">
-            <view class="gh-btn sm" @click="openNewFolderModal">+目录</view>
-            <view class="gh-btn sm" @click="openNewNoteModal">+笔记</view>
-            <view class="gh-btn sm" @click="showExportMenu">导出</view>
-            <view class="panel-collapse" @click="projectStore.toggleFilePanel()" title="收起文件栏">
-              <GhIcon name="chevronLeft" :size="14" />
-            </view>
-          </view>
-        </view>
-        <scroll-view class="file-list" scroll-y>
-          <view v-if="!projectStore.currentProjectId" class="file-empty">请先选择或新建项目</view>
-          <template v-else>
-            <view v-if="projectStore.currentFolderId" class="up-row" @click="projectStore.enterFolder(null)">
-              <GhIcon name="arrowUp" :size="14" />
-              <text>根目录</text>
-            </view>
-            <view
-              v-for="e in projectStore.entries"
-              :key="e.id"
-              class="file-row"
-              :class="{ active: e.kind === 'note' && e.id === projectStore.currentNoteId }"
-              @click="onEntryClick(e)"
-            >
-              <template v-if="e.kind === 'folder'">
-                <GhIcon name="folder" :size="15" />
-                <view class="file-main">
-                  <text class="file-name">{{ e.name }}</text>
-                  <text class="file-summary">{{ (e.meta?.noteCount ?? 0) }} 项</text>
-                </view>
-              </template>
-              <template v-else>
-                <GhIcon name="fileText" :size="15" />
-                <view class="file-main">
-                  <text class="file-name">
-                    {{ e.name }}
-                    <text v-if="e.meta?.pinned" class="pin-mark">置顶</text>
-                  </text>
-                  <text class="file-summary">{{ e.meta?.summary || '（空白笔记）' }}</text>
-                  <text v-if="e.meta?.updatedAt" class="file-time">{{ relativeTimeStr(e.meta.updatedAt) }}</text>
-                </view>
-              </template>
-              <view class="row-menu" @click.stop>
-                <text class="gh-link" @click="onRenameEntry(e)">重命名</text>
-                <text class="gh-link danger" @click="onDeleteEntry(e)">删除</text>
-              </view>
-            </view>
-          </template>
-        </scroll-view>
-        <view class="resizer" @mousedown.prevent="startResize('files', $event)"></view>
+      <view v-else-if="!editorMaximized" class="sidebar-folded" @click="projectStore.toggleSidebar()" title="展开项目栏">
+        <GhIcon name="sidebarExpand" :size="14" />
       </view>
-      <view v-else-if="!editorMaximized" class="file-folded" @click="projectStore.toggleFilePanel()" title="展开文件栏">▸</view>
 
-      <!-- 第三栏：源码编辑 + 预览（§4.2），支持最大化 -->
+      <!-- 第二栏：源码编辑 + 预览（两栏布局：左树+右编辑） -->
       <view class="editor-area" :class="{ maximized: editorMaximized }">
         <template v-if="currentNote">
           <!-- 工具栏：可收缩 -->
@@ -151,13 +99,14 @@
               <view class="gh-btn sm" @click="openRenameModal">重命名</view>
               <view class="gh-btn sm" @click="togglePin">{{ currentNote.pinned ? '取消置顶' : '置顶' }}</view>
               <view class="gh-btn sm" @click="toggleVisibility">{{ currentNote.visibility === 'public' ? '设为私密' : '设为公开' }}</view>
+              <view class="gh-btn sm" @click="openMoveMenu">移动</view>
               <view class="gh-btn sm" @click="openSnapshotPanel">版本快照</view>
               <view class="gh-btn sm" @click="showNoteExportMenu">导出</view>
               <view class="gh-btn sm editor-max-btn" :title="editorMaximized ? '还原' : '最大化'" @click="editorMaximized = !editorMaximized">
                 <GhIcon :name="editorMaximized ? 'minimize' : 'maximize'" :size="14" />
               </view>
               <view class="icon-btn toolbar-toggle" title="收起工具栏" @click="toolbarCollapsed = true">
-                <GhIcon name="chevronDown" :size="15" />
+                <GhIcon name="chevronUp" :size="14" />
               </view>
             </view>
             <text class="save-status">{{ saveStatus }}</text>
@@ -180,6 +129,7 @@
             <view class="gh-btn sm" :class="{ active: viewMode === 'split' }" @click="viewMode = 'split'">分栏</view>
             <view class="gh-btn sm" :class="{ active: viewMode === 'edit' }" @click="viewMode = 'edit'">编辑</view>
             <view class="gh-btn sm" :class="{ active: viewMode === 'preview' }" @click="viewMode = 'preview'">预览</view>
+            <view class="gh-btn sm primary ml-auto" @click="onManualSave" title="立即保存">保存</view>
           </view>
           <view v-show="snapshotOpen" class="bottom-panel">
             <SnapshotPanel />
@@ -283,8 +233,13 @@
     <!-- 移动端抽屉遮罩（自动/手动移动模式下显示） -->
     <view v-if="activeDrawer !== 'none'" class="m-mask" @click="activeDrawer = 'none'"></view>
 
-    <!-- 移动端悬浮按钮（FAB）：点击弹出 项目/文件/设置 入口（替代原底部导航栏） -->
-    <view class="m-fab" @click="fabOpen = !fabOpen">
+    <!-- 移动端悬浮按钮（FAB）：可拖动，点击弹出 项目/文件/设置 入口 -->
+    <view
+      class="m-fab"
+      :style="{ left: fabPos.x + 'px', top: fabPos.y + 'px' }"
+      @mousedown="startFabDrag"
+      @touchstart="startFabDrag"
+    >
       <GhIcon :name="fabOpen ? 'close' : 'repo'" :size="22" />
     </view>
     <view v-if="fabOpen" class="m-fab-mask" @click="fabOpen = false"></view>
@@ -293,17 +248,7 @@
         <GhIcon name="repo" :size="16" />
         <text>项目</text>
       </view>
-      <view class="m-fab-item" @click="onFabAction('file')">
-        <GhIcon name="folder" :size="16" />
-        <text>文件</text>
-      </view>
-      <view class="m-fab-item" @click="onFabAction('settings')">
-        <GhIcon name="gear" :size="16" />
-        <text>设置</text>
-      </view>
     </view>
-
-    <MobileLayoutToggle />
   </view>
 </template>
 
@@ -313,8 +258,11 @@ import Taro from '@tarojs/taro'
 import { useProjectStore } from '@/stores/project'
 import { useEditorStore } from '@/stores/editor'
 import { useThemeStore } from '@/stores/theme'
+import { useAccountStore } from '@/stores/account'
 import { usePreferenceStore } from '@/stores/preference'
 import { globalSearch, type SearchResult } from '@/services/search'
+import { DEFAULT_PRIVATE_PROJECT_ID as DEFAULT_PROJECT_ID, getProject, listProjects } from '@/services/projects'
+import { makeNotePublic, makeNotePrivate, getNote, moveNoteToProject } from '@/services/notes'
 import { exportNoteMd, exportNoteHtml, exportNotePdf, exportProjectMdZip, exportProjectHtmlZip } from '@/services/export'
 import { formatTime, relativeTimeStr } from '@/utils/time'
 import { message } from '@/utils/feedback'
@@ -327,7 +275,6 @@ import AnnotationSection from '@/components/AnnotationSection'
 import AppHeaderActions from '@/components/AppHeaderActions'
 import GhIcon from '@/components/GhIcon'
 import BrandIcon from '@/components/BrandIcon'
-import MobileLayoutToggle from '@/components/MobileLayoutToggle'
 import { isMobileMode, onMobileChange, bindAutoMobile } from '@/utils/mobile'
 
 /**
@@ -337,6 +284,7 @@ import { isMobileMode, onMobileChange, bindAutoMobile } from '@/utils/mobile'
 const projectStore = useProjectStore()
 const editorStore = useEditorStore()
 const themeStore = useThemeStore()
+const accountStore = useAccountStore()
 const prefStore = usePreferenceStore()
 const routeParams = Taro.useRouter().params as Record<string, string>
 
@@ -359,6 +307,42 @@ const mobileMode = ref(isMobileMode())
 const activeDrawer = ref<'none' | 'sidebar' | 'file'>('none')
 /** 移动端悬浮菜单是否展开 */
 const fabOpen = ref(false)
+/** FAB 位置（可拖动，默认左下角） */
+const fabPos = ref({ x: 18, y: window.innerHeight - 80 })
+let fabDragStart: { mx: number; my: number; fx: number; fy: number; moved: boolean } | null = null
+
+function startFabDrag(e: MouseEvent | TouchEvent) {
+  const pt = 'touches' in e ? e.touches[0] : e
+  fabDragStart = { mx: pt.clientX, my: pt.clientY, fx: fabPos.value.x, fy: fabPos.value.y, moved: false }
+  const move = (ev: MouseEvent | TouchEvent) => {
+    if (!fabDragStart) return
+    const p = 'touches' in ev ? ev.touches[0] : ev
+    const dx = p.clientX - fabDragStart.mx
+    const dy = p.clientY - fabDragStart.my
+    if (Math.abs(dx) + Math.abs(dy) > 5) fabDragStart.moved = true
+    fabPos.value.x = Math.max(0, Math.min(window.innerWidth - 60, fabDragStart.fx + dx))
+    fabPos.value.y = Math.max(0, Math.min(window.innerHeight - 60, fabDragStart.fy + dy))
+  }
+  const up = () => {
+    if (fabDragStart && fabDragStart.moved) {
+      // 拖动后不触发点击
+      setTimeout(() => { fabDragStart = null }, 0)
+      e.stopPropagation?.()
+    } else {
+      fabOpen.value = !fabOpen.value
+      fabDragStart = null
+    }
+    document.removeEventListener('mousemove', move)
+    document.removeEventListener('mouseup', up)
+    document.removeEventListener('touchmove', move)
+    document.removeEventListener('touchend', up)
+  }
+  document.addEventListener('mousemove', move)
+  document.addEventListener('mouseup', up)
+  document.addEventListener('touchmove', move)
+  document.addEventListener('touchend', up)
+  e.preventDefault?.()
+}
 
 /** 手动切换移动视图时调整布局状态，保证抽屉可渲染 */
 function applyMobile(m: boolean) {
@@ -452,7 +436,16 @@ async function toggleProjectVisibility(p: { id: string; name: string; visibility
 }
 
 /** 删除项目（含全部目录/笔记/快照/补充区），需二次确认 */
-function confirmDeleteProject(p: { id: string; name: string }) {
+function confirmDeleteProject(p: { id: string; name: string; synced?: boolean }) {
+  // 已同步的项目删除需登录；纯本地项目直接删
+  if (!accountStore.account && p.synced) {
+    Taro.showModal({
+      title: '需要登录',
+      content: '该项目已同步到云端，删除需要登录后才能执行。',
+      showCancel: false
+    })
+    return
+  }
   Taro.showModal({
     title: '删除项目',
     content: `确定删除项目「${p.name}」吗？项目内的全部笔记、目录、快照将一并删除，且无法恢复。`,
@@ -546,6 +539,16 @@ async function confirmRename() {
 }
 
 function onDeleteEntry(e: FileEntry) {
+  // 已同步的内容（synced=true）删除需登录；纯本地新建（synced=false）直接删
+  const curProj = projectStore.currentProject
+  if (!accountStore.account && curProj?.synced) {
+    Taro.showModal({
+      title: '需要登录',
+      content: '该内容已同步到云端，删除操作需要登录后才能执行。',
+      showCancel: false
+    })
+    return
+  }
   const name = e.name
   if (e.kind === 'folder') {
     Taro.showModal({
@@ -585,13 +588,81 @@ async function togglePin() {
 
 async function toggleVisibility() {
   if (!currentNote.value) return
-  const next = currentNote.value.visibility === 'public' ? 'private' : 'public'
-  await editorStore.setNoteVisibility(currentNote.value.id, next)
-  message.success(next === 'public' ? '已设为公开' : '已设为私密')
+  const n = currentNote.value
+  if (n.visibility === 'private') {
+    // 私密 → 公开：弹窗确认
+    const confirmed = await Taro.showModal({
+      title: '设为公开',
+      content: '该文件将移动到"我的公开空间"，所有人可访问。',
+      confirmText: '继续',
+      cancelText: '取消'
+    })
+    if (!confirmed.confirm) return
+    // 已同步的文件（synced=true）需密码；纯本地新建（synced=false）直接操作
+    if (n.synced) {
+      const pwd = await Taro.showModal({
+        title: '输入密码确认',
+        editable: true,
+        placeholderText: '请输入密码',
+        confirmText: '确认',
+        cancelText: '取消'
+      })
+      if (!pwd.confirm) return
+      const proj = await getProject(n.projectId)
+      if (proj?.password && pwd.content !== proj.password) {
+        message.error('密码错误')
+        return
+      }
+    }
+    await makeNotePublic(n.id)
+    await projectStore.loadTree()
+    message.success('已设为公开')
+  } else {
+    // 公开 → 私密：弹窗确认
+    const confirmed = await Taro.showModal({
+      title: '设为私密',
+      content: '该文件将移动到"我的私密空间"，不再对访客展示。',
+      confirmText: '继续',
+      cancelText: '取消'
+    })
+    if (!confirmed.confirm) return
+    await makeNotePrivate(n.id)
+    await editorStore.closeNote()
+    await projectStore.refreshProjects()
+    await projectStore.loadTree()
+    Taro.showToast({ title: '已设为私密', icon: 'success' })
+  }
+}
+
+async function onManualSave() {
+  await editorStore.manualSave()
+  message.success('已保存')
 }
 
 function openSnapshotPanel() {
   snapshotOpen.value = !snapshotOpen.value
+}
+
+// ---- v1.1: 移动到同属性项目 ----
+async function openMoveMenu() {
+  if (!editorStore.currentNote) return
+  const note = editorStore.currentNote
+  const all = await listProjects()
+  // 只列同属性项目，排除当前所在项目
+  const candidates = all.filter(p => p.visibility === note.visibility && p.id !== note.projectId)
+  if (!candidates.length) {
+    message.info('没有其他同属性项目')
+    return
+  }
+  const res = await Taro.showActionSheet({
+    itemList: candidates.map(p => p.name)
+  })
+  const target = candidates[res.tapIndex]
+  if (!target) return
+  await moveNoteToProject(note.id, target.id, null)
+  message.success(`已移动到「${target.name}」`)
+  await projectStore.refreshProjects()
+  await projectStore.loadTree()
 }
 
 // ---- 导出（§4.7） ----
@@ -711,6 +782,15 @@ onMounted(async () => {
       /* 项目/笔记不存在时保持默认工作区 */
     }
   }
+  // 快速写笔记：进默认项目并新建一篇笔记
+  if (routeParams.quick === '1') {
+    try {
+      await projectStore.openProject(DEFAULT_PROJECT_ID)
+      await openNewNoteModal()
+    } catch {
+      /* 默认项目未就绪时忽略 */
+    }
+  }
 })
 
 let mobileOff: (() => void) | null = null
@@ -798,8 +878,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 24px;
+  width: 28px;
+  height: 26px;
   border-radius: 6px;
   color: var(--text-secondary);
   cursor: pointer;
@@ -847,6 +927,33 @@ onBeforeUnmount(() => {
 }
 .tree-title {
   border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+}
+.tree-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.title-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.title-text {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary, #656d76);
+  text-transform: uppercase;
+}
+.header-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+.project-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
 }
 .tree-area {
   flex: 1;
@@ -1076,7 +1183,9 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 6px 14px;
   border-top: 1px solid var(--border-muted);
+  align-items: center;
 }
+.view-switcher .ml-auto { margin-left: auto; }
 .view-switcher .active {
   border-color: var(--accent);
   color: var(--accent);
@@ -1347,8 +1456,6 @@ onBeforeUnmount(() => {
 .m-fab {
   display: none;
   position: fixed;
-  left: 18px;
-  bottom: 24px;
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -1358,7 +1465,8 @@ onBeforeUnmount(() => {
   justify-content: center;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   z-index: 96;
-  cursor: pointer;
+  cursor: grab;
+  user-select: none;
   transition: transform 0.15s;
 }
 

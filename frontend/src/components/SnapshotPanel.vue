@@ -1,105 +1,110 @@
 <template>
   <view class="snapshot-panel">
     <view class="sp-header">
-      <text class="sp-title">版本快照</text>
-      <view class="sp-actions">
-        <view class="gh-input sp-message" placeholder="快照备注（可选）" v-model="snapshotMessage"></view>
-        <view class="gh-btn sm primary" @click="onManualSnapshot">生成快照</view>
-        <view class="gh-btn sm" @click="onRefresh">刷新</view>
-      </view>
+      <text class="sp-title">历史版本</text>
+      <view v-if="!loggedIn" class="gh-btn sm" @click="promptLogin">登录后查看</view>
+      <view v-else class="gh-btn sm" @click="onRefresh">刷新</view>
     </view>
 
-    <view v-if="!editor.snapshots.length" class="sp-empty">
-      暂无快照。编辑正文后会自动生成版本快照（最多保留 {{ editor.getSnapshotLimit() }} 份）。
+    <view v-if="!loggedIn" class="sp-empty">
+      登录后可查看历史版本并回退。
     </view>
 
-    <scroll-view v-else class="sp-list" scroll-y>
+    <scroll-view v-else-if="editor.snapshots.length" class="sp-list" scroll-y>
       <view
-        v-for="snap in editor.snapshots"
+        v-for="(snap, idx) in editor.snapshots"
         :key="snap.id"
         class="sp-item"
-        :class="{ selected: isSelected(snap) }"
-        @click="onToggleSelect(snap)"
+        @click="onRollback(snap, idx)"
       >
         <view class="sp-item-top">
           <text class="sp-time">{{ formatTime(snap.createdAt) }}</text>
-          <text class="sp-kind">{{ snap.kind === 'content' ? '正文' : '补充区' }}</text>
+          <text v-if="idx === 0" class="sp-badge">当前</text>
         </view>
-        <view class="sp-msg">{{ snap.message }}</view>
+        <view class="sp-msg">{{ snap.message || '自动保存' }}</view>
       </view>
     </scroll-view>
-
-    <view v-if="editor.diffOpen && editor.diffResult" class="sp-diff">
-      <view class="sp-diff-header">
-        <text>差异对比（{{ editor.diffBase ? formatTime(editor.diffBase.createdAt) : '' }} → {{ editor.diffTarget ? formatTime(editor.diffTarget.createdAt) : '' }}）</text>
-        <text class="sp-diff-stats">+{{ editor.diffResult.stats.added }} / -{{ editor.diffResult.stats.removed }}</text>
-        <view class="gh-btn sm" @click="editor.closeDiff()">关闭</view>
-        <view v-if="editor.diffTarget" class="gh-btn sm danger" @click="onRollback(editor.diffTarget)">回滚至此版本</view>
-      </view>
-      <view class="sp-diff-body">
-        <view
-          v-for="(line, i) in editor.diffResult.lines"
-          :key="i"
-          class="diff-line"
-          :class="`diff-${line.op}`"
-        >
-          <text class="diff-marker">{{ line.op === 'insert' ? '+' : line.op === 'delete' ? '-' : ' ' }}</text>
-          <text class="diff-text">{{ line.text }}</text>
-        </view>
-      </view>
-    </view>
+    <view v-else-if="loggedIn" class="sp-empty">暂无历史版本</view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useEditorStore } from '@/stores/editor'
+import { useAccountStore } from '@/stores/account'
 import type { Snapshot } from '@/types/models'
 import { formatTime } from '@/utils/time'
+import Taro from '@tarojs/taro'
+import * as apiNS from '@/services/api'
+const api = apiNS.api
+import { saveNoteContent } from '@/services/notes'
+import { message } from '@/utils/feedback'
 
 /**
- * 版本快照面板（§4.4，Web/H5 端）
- * 快照列表、任意两份 diff、回滚；UI 命名统一为「版本快照」，不暴露 Git 术语（§5.7）
+ * 历史版本面板（v1.1）
+ * - 未登录：提示登录
+ * - 登录后：从云端拉历史版本列表，点某版本回退
+ * - 回退会覆盖当前文件，当前文件成为新的历史版本（云端 push 时自动存快照）
  */
 const editor = useEditorStore()
-const snapshotMessage = ref('')
+const account = useAccountStore()
+const loggedIn = ref(!!account.account)
 
-const selected = ref<Snapshot[]>([])
-
-function isSelected(snap: Snapshot): boolean {
-  return selected.value.some((s) => s.id === snap.id)
+function promptLogin() {
+  Taro.showToast({ title: '请先登录', icon: 'none' })
 }
 
-function onToggleSelect(snap: Snapshot) {
-  const idx = selected.value.findIndex((s) => s.id === snap.id)
-  if (idx >= 0) {
-    selected.value.splice(idx, 1)
-  } else {
-    selected.value.push(snap)
+async function fetchSnapshots() {
+  if (!account.account || !editor.currentNote) return
+  try {
+    const list = await api.listCloudSnapshots(account.account.token, editor.currentNote.id)
+    // 云端字段映射到本地 Snapshot 类型
+    const mapped: Snapshot[] = list.map((s: any) => ({
+      id: s.id,
+      noteId: editor.currentNote!.id,
+      kind: 'content' as const,
+      content: s.content,
+      message: s.message || '自动保存',
+      createdAt: s.createdAt,
+    }))
+    editor.setSnapshots(mapped)
+  } catch (e: any) {
+    message.error('拉取历史版本失败')
   }
-  if (selected.value.length === 2) {
-    const [a, b] = selected.value
-    // 时间早的作为基准
-    const base = a.createdAt <= b.createdAt ? a : b
-    const target = a.createdAt > b.createdAt ? a : b
-    void editor.openDiff(base, target)
-  }
-}
-
-async function onManualSnapshot() {
-  const msg = snapshotMessage.value
-  snapshotMessage.value = ''
-  await editor.manualSnapshot(msg)
 }
 
 function onRefresh() {
-  void editor.reloadSnapshots()
+  fetchSnapshots()
 }
 
-function onRollback(snap: Snapshot) {
-  void editor.doRollback(snap)
-  selected.value = []
+async function onRollback(snap: Snapshot, idx: number) {
+  // 第一个是当前版本，不用回退
+  if (idx === 0) return
+  const confirmed = await Taro.showModal({
+    title: '回退到此版本？',
+    content: `将覆盖当前内容为 ${formatTime(snap.createdAt)} 的版本，当前版本会保留为新的历史记录。`,
+    confirmText: '回退',
+    cancelText: '取消',
+  })
+  if (!confirmed.confirm) return
+  if (!editor.currentNote) return
+  // 用快照内容覆盖当前文件
+  editor.content = snap.content
+  await saveNoteContent(editor.currentNote.id, snap.content)
+  editor.currentNote = { ...editor.currentNote, content: snap.content, updatedAt: Date.now() }
+  message.success('已回退')
+  // 重新拉快照（回退后云端会自动存一份当前版本的快照）
+  setTimeout(fetchSnapshots, 500)
 }
+
+// 切换笔记时重新拉
+watch(() => editor.currentNote?.id, () => {
+  if (loggedIn.value) fetchSnapshots()
+})
+
+onMounted(() => {
+  if (loggedIn.value) fetchSnapshots()
+})
 </script>
 
 <style scoped lang="scss">
@@ -113,6 +118,7 @@ function onRollback(snap: Snapshot) {
 .sp-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
@@ -120,20 +126,6 @@ function onRollback(snap: Snapshot) {
 .sp-title {
   font-weight: 600;
   font-size: 13px;
-  white-space: nowrap;
-}
-.sp-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-}
-.sp-message {
-  flex: 1;
-  min-width: 0;
-  height: 26px;
-  padding: 0 8px;
-  font-size: 12px;
 }
 .sp-empty {
   padding: 24px 16px;
@@ -152,9 +144,6 @@ function onRollback(snap: Snapshot) {
 .sp-item:hover {
   background: var(--hover);
 }
-.sp-item.selected {
-  background: var(--accent-muted);
-}
 .sp-item-top {
   display: flex;
   align-items: center;
@@ -164,12 +153,12 @@ function onRollback(snap: Snapshot) {
   font-size: 12px;
   font-weight: 600;
 }
-.sp-kind {
-  font-size: 11px;
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
+.sp-badge {
+  font-size: 10px;
+  color: #2d6a4f;
+  background: rgba(45, 106, 79, 0.1);
+  padding: 1px 6px;
   border-radius: 8px;
-  padding: 0 6px;
 }
 .sp-msg {
   font-size: 12px;
@@ -178,51 +167,5 @@ function onRollback(snap: Snapshot) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.sp-diff {
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  max-height: 40%;
-}
-.sp-diff-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: 12px;
-  border-bottom: 1px solid var(--border);
-}
-.sp-diff-stats {
-  color: var(--text-secondary);
-}
-.sp-diff-body {
-  overflow-y: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-}
-.diff-line {
-  display: flex;
-  padding: 0 12px;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.diff-marker {
-  width: 16px;
-  flex-shrink: 0;
-  color: var(--text-muted);
-}
-.diff-insert {
-  background: rgba(46, 160, 67, 0.15);
-}
-.diff-insert .diff-marker {
-  color: var(--success);
-}
-.diff-delete {
-  background: rgba(248, 81, 73, 0.15);
-}
-.diff-delete .diff-marker {
-  color: var(--danger);
 }
 </style>

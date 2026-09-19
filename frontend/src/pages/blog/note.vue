@@ -23,7 +23,6 @@
       <AnnotationSection :note-id="note.id" :editable="false" />
     </view>
     <view v-else class="empty-state">笔记不存在或为私密笔记</view>
-    <MobileLayoutToggle />
   </view>
 </template>
 
@@ -35,7 +34,6 @@ import type { Note } from '@/types/models'
 import { relativeTimeStr } from '@/utils/time'
 import MarkdownPreview from '@/components/MarkdownPreview'
 import AnnotationSection from '@/components/AnnotationSection'
-import MobileLayoutToggle from '@/components/MobileLayoutToggle'
 
 /**
  * 公开笔记页（§4.6.3）

@@ -58,5 +58,10 @@ export const api = {
     request<{ accepted: number }>('/sync/push', { method: 'POST', body: { changes }, token }),
 
   pull: (token: string, since = 0) =>
-    request<{ changes: SyncChange[]; serverTime: number }>(`/sync/pull?since=${since}`, { token })
+    request<{ changes: SyncChange[]; serverTime: number }>(`/sync/pull?since=${since}`, { token }),
+
+  /** v1.1: 列出某笔记的云端历史版本 */
+  listCloudSnapshots: (token: string, noteId: string) =>
+    request<{ id: string; content: string; message: string | null; createdAt: number }[]>(
+      `/sync/snapshots?noteId=${encodeURIComponent(noteId)}`, { token })
 }

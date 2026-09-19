@@ -51,8 +51,19 @@ export class DatabaseService implements OnModuleDestroy {
         );
         CREATE INDEX IF NOT EXISTS idx_sync_changes_user_time
           ON sync_changes (user_id, updated_at);
+        -- v1.1: 云端历史版本（快照）
+        CREATE TABLE IF NOT EXISTS cloud_snapshots (
+          id         VARCHAR(48) PRIMARY KEY,
+          user_id    VARCHAR(40) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          note_id    VARCHAR(40) NOT NULL,
+          content    TEXT NOT NULL,
+          message    VARCHAR(255),
+          created_at BIGINT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_cloud_snapshots_note
+          ON cloud_snapshots (user_id, note_id, created_at DESC);
       `);
-      this.logger.log('数据库表结构就绪（users / sync_changes）');
+      this.logger.log('数据库表结构就绪（users / sync_changes / cloud_snapshots）');
     } catch (err) {
       this.logger.error('初始化数据库表结构失败', err as Error);
     }

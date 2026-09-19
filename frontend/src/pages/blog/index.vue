@@ -28,83 +28,45 @@
           <text class="search-project">{{ r.projectName }}</text>
         </view>
         <view class="search-snippet">{{ r.snippet }}</view>
-        <view class="search-tags">
-          <text v-for="m in r.matchedBy" :key="m" class="gh-tag">{{ tagName(m) }}</text>
-        </view>
       </view>
     </view>
 
-    <!-- 个人主页（§4.6） -->
-    <view v-else class="profile-page">
-      <!-- 顶部资料区：已登录显示用户名首字母，未登录显示品牌图标 -->
-      <view class="profile-head">
-        <view class="profile-avatar">
-          <template v-if="accountStore.isLoggedIn">{{ accountStore.initial }}</template>
-          <BrandIcon v-else :size="40" variant="flat" />
-        </view>
-        <view class="profile-info">
-          <view class="profile-name">{{ profileName }}</view>
-          <view class="profile-bio">{{ profileBio }}</view>
-          <view class="profile-stats">
-            <view class="stat">
-              <text class="stat-num">{{ visibleProjects.length }}</text>
-              <text class="stat-label">项目</text>
-            </view>
-            <view class="stat">
-              <text class="stat-num">{{ totalNotes }}</text>
-              <text class="stat-label">笔记</text>
-            </view>
-            <view class="stat">
-              <text class="stat-num">{{ totalTopics }}</text>
-              <text class="stat-label">主题</text>
-            </view>
+    <!-- v1.1 新首页：快速写笔记 + 近期文件 -->
+    <view v-else class="home-page">
+      <view class="quick-btn" @click="quickWrite">✏️ 快速写笔记</view>
+
+      <view class="section-title">近期文件</view>
+
+      <view v-if="!pagedNotes.length" class="empty-state">
+        还没有笔记，点上方按钮快速写一篇。
+      </view>
+
+      <view v-else>
+        <view
+          v-for="n in pagedNotes"
+          :key="n.id"
+          class="recent-item"
+          @click="goNote(n.projectId, n.id)"
+        >
+          <view class="recent-name-row">
+            <view class="recent-name">{{ n.title || '未命名' }}</view>
+            <text v-if="n.pinned" class="pinned-badge">置顶</text>
           </view>
+          <view class="recent-excerpt">{{ excerpt(n.content) }}</view>
+          <view class="recent-meta">{{ relativeTimeStr(n.updatedAt) }} · {{ projectName(n.projectId) }}</view>
         </view>
       </view>
 
-      <view class="profile-body">
-        <!-- 左侧导航（仅 Projects） -->
-        <view class="profile-nav">
-          <view class="nav-item" :class="{ active: nav === 'projects' }" @click="nav = 'projects'">Projects</view>
-        </view>
-
-        <!-- 主内容：项目卡片网格（本人已登录：公开+私密全部展示；游客：仅公开） -->
-        <view class="profile-main">
-          <view class="section-title">
-            <text>项目</text>
-            <text class="count">{{ visibleProjects.length }}</text>
-          </view>
-          <view v-if="!visibleProjects.length" class="empty-state">
-            暂无项目。在工作区中可创建项目。
-          </view>
-          <view v-else class="repo-grid">
-            <view v-for="p in visibleProjects" :key="p.id" class="repo-card" @click="goProject(p)">
-              <view class="repo-name-row">
-                <text class="gh-link repo-name-text">{{ p.name }}</text>
-                <text v-if="p.visibility === 'private'" class="repo-lock">私密</text>
-                <text v-else-if="p.password" class="repo-lock">密码</text>
-              </view>
-              <view class="repo-desc">{{ p.description || '暂无描述' }}</view>
-              <view class="repo-topics">
-                <text v-for="t in (p.topics || []).slice(0, 3)" :key="t" class="gh-tag repo-topic">{{ t }}</text>
-              </view>
-              <view class="repo-foot">
-                <view class="repo-lang">
-                  <view class="lang-dot"></view>
-                  <text>Markdown</text>
-                </view>
-                <view class="repo-star">
-                  <text class="star-icon">★</text>
-                  <text>{{ noteCounts[p.id] ?? 0 }}</text>
-                </view>
-                <text class="repo-updated">Updated {{ relativeTimeStr(p.updatedAt) }}</text>
-              </view>
-            </view>
-          </view>
-        </view>
+      <!-- 分页 -->
+      <view v-if="totalPages > 1" class="pager">
+        <text class="pager-btn" :class="{ disabled: page === 1 }" @click="prevPage">← 上一页</text>
+        <text class="pager-info">第 {{ page }} / {{ totalPages }} 页</text>
+        <text v-if="page < totalPages" class="pager-btn" @click="nextPage">下一页 →</text>
+        <text v-else class="pager-end">已显示最近 50 条 · <text class="gh-link" @click="goProjects">进入项目查看全部</text></text>
       </view>
+
+      <view class="view-all" @click="goProjects">查看全部项目 →</view>
     </view>
-    <MobileLayoutToggle />
   </view>
 </template>
 
@@ -112,52 +74,59 @@
 import { ref, computed, onMounted } from 'vue'
 import Taro, { useLoad } from '@tarojs/taro'
 import { listProjects } from '@/services/projects'
-import { countProjectNotes } from '@/services/notes'
+import { listRecentNotes } from '@/services/notes'
 import { globalSearch } from '@/services/search'
-import type { Project } from '@/types/models'
+import type { Project, Note } from '@/types/models'
 import { relativeTimeStr } from '@/utils/time'
 import AppHeaderActions from '@/components/AppHeaderActions'
 import BrandIcon from '@/components/BrandIcon'
 import GhIcon from '@/components/GhIcon'
-import MobileLayoutToggle from '@/components/MobileLayoutToggle'
 import { isMobileMode, onMobileChange, bindAutoMobile } from '@/utils/mobile'
 import { useAccountStore } from '@/stores/account'
+import { DEFAULT_PRIVATE_PROJECT_ID as DEFAULT_PROJECT_ID } from '@/services/projects'
 
-/**
- * 公开博客主页（§4.6）
- * Profile 样式：顶部资料区 + 统计 + 左侧导航 + 项目卡片网格
- */
-const publicProjects = ref<Project[]>([])
-const noteCounts = ref<Record<string, number>>({})
+const PAGE_SIZE = 10
+const MAX_NOTES = 50
+
+const allNotes = ref<Note[]>([])
+const projectsMap = ref<Record<string, Project>>({})
 const keyword = ref('')
 const searchResults = ref<Awaited<ReturnType<typeof globalSearch>>>([])
-const nav = ref('projects')
-/** 移动端自适应视图 */
+const page = ref(1)
 const mobileMode = ref(isMobileMode())
-
 const accountStore = useAccountStore()
-/** 主页名称：已登录展示账号用户名，未登录展示品牌名 */
-const profileName = computed(() => (accountStore.isLoggedIn ? accountStore.username : 'MYO Space'))
-const profileBio = '记录与分享'
 
-/** 主页展示的项目列表：本地全部项目（公开+私密都展示） */
-const visibleProjects = computed(() => publicProjects.value)
-
-const totalNotes = computed(() =>
-  Object.values(noteCounts.value).reduce((a, b) => a + b, 0)
-)
-const totalTopics = computed(() => {
-  const set = new Set<string>()
-  for (const p of publicProjects.value) for (const t of p.topics || []) set.add(t)
-  return set.size
+const totalPages = computed(() => Math.min(5, Math.ceil(allNotes.value.length / PAGE_SIZE)))
+const pagedNotes = computed(() => {
+  const start = (page.value - 1) * PAGE_SIZE
+  return allNotes.value.slice(start, start + PAGE_SIZE)
 })
 
+function projectName(pid: string): string {
+  return projectsMap.value[pid]?.name ?? '未分类'
+}
+
+function excerpt(content: string): string {
+  const text = (content || '').replace(/[#*`>\-\[\]()!]/g, '').replace(/\s+/g, ' ').trim()
+  return text.slice(0, 80) || '（空）'
+}
+
 async function load() {
-  // 主页展示本地全部项目（公开+私密都展示；游客公网分享场景后续版本实现）
-  publicProjects.value = await listProjects()
-  for (const p of publicProjects.value) {
-    noteCounts.value[p.id] = await countProjectNotes(p.id)
-  }
+  const [projects, notes] = await Promise.all([listProjects(), listRecentNotes(MAX_NOTES)])
+  projectsMap.value = Object.fromEntries(projects.map((p) => [p.id, p]))
+  allNotes.value = notes
+}
+
+function quickWrite() {
+  // 快速写笔记：跳到工作区，默认项目
+  Taro.reLaunch({ url: '/pages/workspace/index?quick=1' })
+}
+
+function prevPage() { if (page.value > 1) page.value-- }
+function nextPage() { if (page.value < totalPages.value) page.value++ }
+
+function goProjects() {
+  Taro.navigateTo({ url: '/pages/blog/projects' })
 }
 
 const debounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
@@ -166,23 +135,9 @@ function onSearchInput(e: { detail: { value: string } }) {
   if (debounceTimer.value) clearTimeout(debounceTimer.value)
   debounceTimer.value = setTimeout(async () => {
     const kw = keyword.value.trim()
-    if (!kw) {
-      searchResults.value = []
-      return
-    }
-    // 只搜公开项目内的公开笔记
-    const all = await globalSearch(kw)
-    const pubIds = new Set(publicProjects.value.map((p) => p.id))
-    searchResults.value = all.filter((r) => pubIds.has(r.projectId))
+    if (!kw) { searchResults.value = []; return }
+    searchResults.value = await globalSearch(kw)
   }, 300)
-}
-
-function tagName(m: string): string {
-  return m === 'title' ? '标题' : m === 'topic' ? '标签' : '正文'
-}
-
-function goProject(p: Project) {
-  Taro.navigateTo({ url: `/pages/blog/project?id=${p.id}` })
 }
 
 function goNote(projectId: string, noteId: string) {
@@ -206,9 +161,7 @@ useLoad((options) => {
 
 onMounted(() => {
   load()
-  mobileOff = onMobileChange((m) => {
-    mobileMode.value = m
-  })
+  mobileOff = onMobileChange((m) => { mobileMode.value = m })
   autoMobileOff = bindAutoMobile(() => document.querySelector('.blog-page'))
 })
 
@@ -236,9 +189,7 @@ let autoMobileOff: (() => void) | null = null
   flex: 1;
   max-width: 420px;
 }
-.search-input {
-  height: 30px;
-}
+.search-input { height: 30px; }
 .blog-container {
   max-width: 880px;
   margin: 0 auto;
@@ -248,17 +199,6 @@ let autoMobileOff: (() => void) | null = null
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.count {
-  font-size: 13px;
-  color: var(--text-secondary);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0 8px;
 }
 .empty-state {
   padding: 48px 0;
@@ -266,174 +206,89 @@ let autoMobileOff: (() => void) | null = null
   color: var(--text-secondary);
 }
 
-/* ===== 个人主页（GitHub Profile 样式） ===== */
-.profile-page {
-  max-width: 1080px;
+/* ===== v1.1 新首页 ===== */
+.home-page {
+  max-width: 760px;
   margin: 0 auto;
-  padding: 24px 20px 64px;
+  padding: 32px 20px 64px;
 }
-.profile-head {
-  display: flex;
-  gap: 20px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--border-muted);
-}
-.profile-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  /* 品牌蓝紫渐变头像底 */
-  background: linear-gradient(135deg, #7c5cff 0%, #4f46e5 55%, #0ea5e9 100%);
-  color: #fff;
-  font-size: 28px;
-  font-weight: 700;
-  display: flex;
+.quick-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
-}
-.profile-info {
-  flex: 1;
-  min-width: 0;
-}
-.profile-name {
-  font-size: 20px;
-  font-weight: 700;
-}
-.profile-bio {
-  margin-top: 2px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.profile-stats {
-  display: flex;
-  gap: 20px;
-  margin-top: 10px;
-}
-.stat {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-.stat-num {
-  font-size: 16px;
-  font-weight: 600;
-}
-.stat-label {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.profile-body {
-  display: flex;
-  gap: 24px;
-  margin-top: 20px;
-}
-.profile-nav {
-  width: 140px;
-  flex-shrink: 0;
-}
-.nav-item {
-  padding: 8px 12px;
+  gap: 8px;
+  background: #0969da;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 8px;
   font-size: 14px;
-  color: var(--text-secondary);
   cursor: pointer;
-  border-radius: 6px;
-  margin-bottom: 2px;
+  margin-bottom: 28px;
 }
-.nav-item:hover {
-  color: var(--text);
-  background: var(--bg-subtle);
-}
-.nav-item.active {
-  color: var(--text);
-  font-weight: 600;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-}
-.profile-main {
-  flex: 1;
-  min-width: 0;
-}
+.quick-btn:hover { background: #0860c5; }
 
-/* 项目卡片网格（GitHub Profile 风格） */
-.repo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-.repo-card {
+.recent-item {
+  display: block;
+  padding: 16px 20px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 16px;
+  margin-bottom: 10px;
   cursor: pointer;
   background: var(--bg-card);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
-.repo-card:hover {
-  border-color: var(--accent);
+.recent-item:hover { border-color: var(--accent); }
+.recent-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
 }
-.repo-name-row {
+.recent-name-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
-.repo-name-text {
-  font-size: 15px;
-  font-weight: 600;
+.pinned-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #2d6a4f;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
 }
-.repo-lock {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.repo-desc {
+.recent-excerpt {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.5;
-  min-height: 38px;
 }
-.repo-topics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.repo-topic {
-  font-size: 11px;
-}
-.repo-foot {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.recent-meta {
   font-size: 12px;
   color: var(--text-muted);
-  margin-top: auto;
-  padding-top: 8px;
+  margin-top: 6px;
 }
-.repo-lang {
+
+.pager {
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 5px;
-}
-.lang-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #3572a5; /* Markdown 语言色 */
-}
-.repo-star {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-.star-icon {
-  color: var(--text-muted);
+  gap: 16px;
+  margin-top: 20px;
   font-size: 13px;
 }
-.repo-updated {
-  margin-left: auto;
+.pager-btn {
+  color: var(--accent);
+  cursor: pointer;
+}
+.pager-btn.disabled { color: var(--text-muted); cursor: default; }
+.pager-info { color: var(--text-secondary); }
+.pager-end { color: var(--text-secondary); }
+
+.view-all {
+  margin-top: 16px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-block;
 }
 
 .search-item {
@@ -445,79 +300,16 @@ let autoMobileOff: (() => void) | null = null
   align-items: center;
   gap: 10px;
 }
-.search-project {
-  font-size: 12px;
-  color: var(--text-muted);
-}
+.search-project { font-size: 12px; color: var(--text-muted); }
 .search-snippet {
   margin-top: 4px;
   font-size: 13px;
   color: var(--text-secondary);
 }
-.search-tags {
-  margin-top: 6px;
-  display: flex;
-  gap: 6px;
-}
 
-/* ============ 移动端自适应视图 ============
-   手机宽度自动单栏；底部按钮可手动强制（.mobile-mode 覆盖）
-*/
-@mixin mobile-blog-layout {
-  .profile-body {
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .profile-nav {
-    width: 100%;
-    display: flex;
-    gap: 4px;
-    overflow-x: auto;
-  }
-
-  .nav-item {
-    flex-shrink: 0;
-    margin-bottom: 0;
-  }
-
-  .repo-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .gh-header {
-    flex-wrap: nowrap;
-    gap: 8px;
-    padding: 10px 12px;
-  }
-
-  .header-search {
-    flex: 1;
-    max-width: 320px;
-    margin-left: 12px;
-    order: 0;
-  }
-
-  .workspace-link {
-    flex-shrink: 0;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    padding: 4px;
-    border-radius: 6px;
-  }
-  .workspace-link:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-}
-
-.blog-page.mobile-mode {
-  @include mobile-blog-layout;
-}
-
+/* ============ 移动端 ============ */
 @media (max-width: 767px) {
-  .blog-page:not(.no-auto-mobile) {
-    @include mobile-blog-layout;
-  }
+  .blog-page:not(.no-auto-mobile) .home-page { padding: 20px 12px 64px; }
+  .header-search { max-width: 320px; }
 }
 </style>

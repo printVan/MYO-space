@@ -5,6 +5,11 @@
       <GhIcon name="boardPin" :size="18" />
     </view>
 
+    <!-- 项目管理入口 -->
+    <view class="icon-btn" title="项目管理" @click="goProjects">
+      <GhIcon name="briefcase" :size="16" />
+    </view>
+
     <!-- 账号入口：未登录显示登录，已登录显示头像 -->
     <view class="account-entry" @click="openAccountModal">
       <template v-if="!accountStore.isLoggedIn">
@@ -103,7 +108,7 @@ import GhIcon from './GhIcon.vue'
 import BrandIcon from './BrandIcon.vue'
 
 /**
- * 顶栏操作区：公开博客入口 + 账号（登录/同步）+ 设置 + 主题
+ * 顶栏操作区：项目管理 + 首页 + 账号（登录/同步）+ 设置 + 主题
  * 悬浮在账号入口上时显示提示（未登录提示本地保存与登录同步）
  */
 const props = withDefaults(
@@ -182,6 +187,9 @@ function goSettings() {
 function goBlog() {
   if (!props.showBlogLink) return
   Taro.reLaunch({ url: '/pages/blog/index' })
+}
+function goProjects() {
+  Taro.navigateTo({ url: '/pages/blog/projects' })
 }
 
 defineExpose({ openAccountModal })

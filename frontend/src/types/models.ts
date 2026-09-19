@@ -17,6 +17,8 @@ export interface Project {
   topics: string[]
   createdAt: number
   updatedAt: number
+  /** v1.1: 是否已同步到云端（false=纯本地新建，可自由操作；true=云端已存在，操作需登录） */
+  synced?: boolean
 }
 
 /** 目录树节点（无限层级文件夹） */
@@ -43,11 +45,13 @@ export interface Note {
   /** 项目内置顶，置顶条目在文件列表顶部优先展示 */
   pinned: boolean
   topics: string[]
+  /** v1.1: 公开副本关联的原私密笔记 id（私密→公开复制时写入副本） */
+  publicSourceNoteId?: string
   createdAt: number
   updatedAt: number
+  /** v1.1: 是否已同步到云端（false=纯本地新建，可自由操作；true=云端已存在，操作需登录+密码） */
+  synced?: boolean
 }
-
-/** 版本快照（自研快照版本系统，非 Git） */
 export interface Snapshot {
   id: string
   noteId: string

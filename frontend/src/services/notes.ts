@@ -1,6 +1,8 @@
 import { db } from '@/db'
 import { genId } from '@/utils/id'
 import type { Note } from '@/types/models'
+import { DEFAULT_PUBLIC_PROJECT_ID, DEFAULT_PRIVATE_PROJECT_ID } from './projects'
+import { useAccountStore } from '@/stores/account'
 
 /** 创建笔记 */
 export async function createNote(data: {
@@ -11,15 +13,18 @@ export async function createNote(data: {
   visibility?: 'public' | 'private'
 }): Promise<Note> {
   const now = Date.now()
+  // 登录状态下创建的文件自带已同步标识
+  const account = useAccountStore().account
   const note: Note = {
     id: genId('n_'),
     projectId: data.projectId,
     folderId: data.folderId,
     title: data.title.replace(/\.md$/i, ''),
     content: data.content ?? '',
-    visibility: data.visibility ?? 'public',
+    visibility: data.visibility ?? 'private',
     pinned: false,
     topics: [],
+    synced: !!account,
     createdAt: now,
     updatedAt: now
   }
@@ -47,7 +52,7 @@ export async function renameNote(id: string, title: string): Promise<void> {
   await db.notes.update(id, { title: title.replace(/\.md$/i, ''), updatedAt: Date.now() })
 }
 
-/** 移动笔记（拖拽到其他文件夹） */
+/** 移动笔记（项目内换文件夹） */
 export async function moveNote(id: string, folderId: string | null): Promise<void> {
   await db.notes.update(id, { folderId, updatedAt: Date.now() })
 }
@@ -70,4 +75,56 @@ export async function listPublicNotes(projectId: string, folderId: string | null
 /** 项目笔记总数（公开页展示） */
 export async function countProjectNotes(projectId: string): Promise<number> {
   return db.notes.where('projectId').equals(projectId).count()
+}
+
+/** v1.1: 首页近期文件——按更新时间倒序取最近 N 条 */
+export async function listRecentNotes(limit = 50): Promise<Note[]> {
+  const all = await db.notes.orderBy('updatedAt').reverse().limit(limit).toArray()
+  return all
+}
+
+/** v1.1: 跨项目移动笔记（同属性项目间，直接改 projectId/folderId） */
+export async function moveNoteToProject(
+  noteId: string,
+  targetProjectId: string,
+  targetFolderId: string | null
+): Promise<void> {
+  await db.notes.update(noteId, {
+    projectId: targetProjectId,
+    folderId: targetFolderId,
+    updatedAt: Date.now()
+  })
+}
+
+/**
+ * v1.1: 私密 → 公开（简化逻辑）
+ * 本质：直接把文件移动到"我的公开空间"根目录，visibility 改为 public
+ * 内容/快照/时间戳都不变
+ */
+export async function makeNotePublic(noteId: string): Promise<void> {
+  await db.notes.update(noteId, {
+    projectId: DEFAULT_PUBLIC_PROJECT_ID,
+    folderId: null,
+    visibility: 'public',
+    updatedAt: Date.now()
+  })
+}
+
+/**
+ * v1.1: 公开 → 私密（简化逻辑）
+ * 本质：直接把文件移动到"我的私密空间"根目录，visibility 改为 private
+ * 内容/快照/时间戳都不变
+ */
+export async function makeNotePrivate(noteId: string): Promise<void> {
+  await db.notes.update(noteId, {
+    projectId: DEFAULT_PRIVATE_PROJECT_ID,
+    folderId: null,
+    visibility: 'private',
+    updatedAt: Date.now()
+  })
+}
+
+/** v1.1: 列出某项目下所有笔记（用于移动选择目标） */
+export async function listNotesInProject(projectId: string): Promise<Note[]> {
+  return db.notes.where('projectId').equals(projectId).toArray()
 }

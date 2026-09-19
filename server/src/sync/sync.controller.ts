@@ -20,4 +20,12 @@ export class SyncController {
     const sinceTs = Number(since ?? 0);
     return this.sync.pull(user.sub, Number.isFinite(sinceTs) ? sinceTs : 0);
   }
+
+  /** v1.1: 列出某笔记的云端历史版本 */
+  @Get('snapshots')
+  listSnapshots(@CurrentUser() user: JwtUser | null, @Query('noteId') noteId?: string) {
+    if (!user) throw new UnauthorizedException('未登录');
+    if (!noteId) throw new Error('noteId 必填');
+    return this.sync.listCloudSnapshots(user.sub, noteId);
+  }
 }

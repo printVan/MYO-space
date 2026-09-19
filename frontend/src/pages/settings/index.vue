@@ -47,6 +47,24 @@
             <text class="switch-label">{{ autoMobile ? '允许' : '不允许' }}</text>
           </view>
         </view>
+        <view v-if="!autoMobile" class="setting-row">
+          <view class="setting-label">
+            <text class="label-title">视图模式</text>
+            <text class="label-desc">手动指定当前使用桌面布局还是移动布局</text>
+          </view>
+          <view class="view-mode-picker">
+            <view
+              class="mode-chip"
+              :class="{ active: !mobileForced }"
+              @click="setViewMode(false)"
+            >桌面视图</view>
+            <view
+              class="mode-chip"
+              :class="{ active: mobileForced }"
+              @click="setViewMode(true)"
+            >移动视图</view>
+          </view>
+        </view>
       </view>
 
       <view class="settings-section">
@@ -79,7 +97,7 @@
         </view>
       </view>
     </view>
-    <MobileLayoutToggle />
+
 
     <!-- 自定义确认弹窗 -->
     <view v-if="confirmOpen" class="modal-mask" @click.self="confirmOpen = false">
@@ -104,8 +122,7 @@ import { db } from '@/db'
 import AppHeaderActions from '@/components/AppHeaderActions'
 import BrandIcon from '@/components/BrandIcon'
 import GhIcon from '@/components/GhIcon'
-import MobileLayoutToggle from '@/components/MobileLayoutToggle'
-import { isAutoMobileEnabled, setAutoMobileEnabled, onAutoMobileChange } from '@/utils/mobile'
+import { isAutoMobileEnabled, setAutoMobileEnabled, onAutoMobileChange, isMobileMode, setMobileMode, onMobileChange } from '@/utils/mobile'
 
 /**
  * 设置页（本地偏好配置 §3.2）
@@ -122,10 +139,17 @@ const statsText = computed(
 
 /** 自动适配手机端开关（默认允许） */
 const autoMobile = ref(isAutoMobileEnabled())
+const mobileForced = ref(isMobileMode())
 let offAuto: (() => void) | null = null
+let offMobile: (() => void) | null = null
 
 function toggleAutoMobile() {
   setAutoMobileEnabled(!autoMobile.value)
+}
+
+function setViewMode(mobile: boolean) {
+  setMobileMode(mobile)
+  mobileForced.value = mobile
 }
 
 async function loadStats() {
@@ -188,10 +212,14 @@ onMounted(() => {
   offAuto = onAutoMobileChange((enabled) => {
     autoMobile.value = enabled
   })
+  offMobile = onMobileChange((m) => {
+    mobileForced.value = m
+  })
 })
 
 onUnmounted(() => {
   offAuto?.()
+  offMobile?.()
 })
 </script>
 
@@ -272,6 +300,24 @@ onUnmounted(() => {
 }
 .danger-text {
   color: var(--danger);
+}
+.view-mode-picker {
+  display: flex;
+  gap: 8px;
+}
+.mode-chip {
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border, #d0d7de);
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text, #24292f);
+  transition: all 0.15s;
+}
+.mode-chip.active {
+  background: #0969da;
+  border-color: #0969da;
+  color: #fff;
 }
 .theme-switch {
   display: flex;

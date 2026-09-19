@@ -4,20 +4,27 @@ import { api, type SyncChange } from '@/services/api'
 import type { Account } from '@/types/models'
 
 /**
- * 账号与云端同步（§3.3 / §4.8）
- * 本地优先：未登录时全部数据保存在 IndexedDB 完整可用；
- * 登录后可将本地数据同步备份到后端网关。
+ * 账号与云端同步（v1.1 改造）
+ * - 仅同步：只 push 本地新增/修改，不 pull，不持久化 token
+ * - 登录：三选一（取消登录/覆盖本地/推送云端），存 token
+ * - 本地废弃 snapshots 表，快照由云端自动生成
  */
 
-type SyncEntity = SyncChange['entity']
-type SyncTable = 'projects' | 'folders' | 'notes' | 'snapshots' | 'annotations'
+type SyncEntity = Exclude<SyncChange['entity'], 'snapshot'>
+type SyncTable = 'projects' | 'folders' | 'notes' | 'annotations'
 
 const TABLE_MAP: Record<SyncEntity, SyncTable> = {
   project: 'projects',
   folder: 'folders',
   note: 'notes',
-  snapshot: 'snapshots',
   annotation: 'annotations'
+}
+
+export interface DiffItem {
+  change: SyncChange
+  /** 用于 UI 展示的名称 */
+  label: string
+  status: 'new' | 'modified'
 }
 
 export const useAccountStore = defineStore('account', {
@@ -75,48 +82,76 @@ export const useAccountStore = defineStore('account', {
     },
 
     /**
-     * 一键同步：先拉取云端增量合并到本地，再把本地全量推送到云端
-     * （远端更新优先；本地数据在下次编辑后再次推送覆盖）
+     * 收集本地所有 upsert 变更（v1.1: 不含 snapshots，因为废弃）
+     * 用于同步弹窗展示文件级 diff
      */
-    async syncNow(): Promise<void> {
-      if (!this.account) throw new Error('请先登录')
+    async collectLocalChanges(): Promise<DiffItem[]> {
+      const items: DiffItem[] = []
+      for (const [entity, table] of Object.entries(TABLE_MAP) as [SyncEntity, SyncTable][]) {
+        const rows = await (db[table] as any).toArray()
+        for (const row of rows) {
+          const updatedAt = row.updatedAt ?? Date.now()
+          items.push({
+            change: {
+              id: `push:${entity}:${row.id}:${updatedAt}`,
+              entity,
+              op: 'upsert',
+              data: { ...row },
+              updatedAt
+            },
+            label: (row.title || row.name || row.id) as string,
+            status: 'new' as const
+          })
+        }
+      }
+      return items
+    },
+
+    /**
+     * 仅同步：只 push 选中的本地变更，不 pull，不持久化 token
+     * 用于"不登录但备份到云端"场景
+     */
+    async pushOnly(token: string, changes: SyncChange[]): Promise<{ accepted: number }> {
       this.syncing = true
       try {
-        const token = this.account.token
-        // 1) 拉取远端变更并合并到本地
+        const result = await api.push(token, changes)
+        return result
+      } finally {
+        this.syncing = false
+      }
+    },
+
+    /**
+     * 登录模式：用云端数据覆盖本地
+     * 拉云端所有变更，按 LWW 覆盖本地
+     */
+    async overwriteFromCloud(token: string): Promise<void> {
+      this.syncing = true
+      try {
         const { changes } = await api.pull(token, 0)
         for (const c of changes) {
-          const table = TABLE_MAP[c.entity]
+          const table = TABLE_MAP[c.entity as SyncEntity]
           if (!table || !c.data?.id) continue
           if (c.op === 'delete') {
             await (db[table] as any).delete(c.data.id as string)
           } else {
-            const local = await (db[table] as any).get(c.data.id)
-            if (!local || (c.data.updatedAt as number) > (local.updatedAt as number)) {
-              await (db[table] as any).put(c.data)
-            }
+            await (db[table] as any).put(c.data)
           }
         }
-        // 2) 推送本地全量（幂等 id 由实体 + id + updatedAt 组成）
-        const localChanges: SyncChange[] = []
-        for (const [entity, table] of Object.entries(TABLE_MAP) as [SyncEntity, SyncTable][]) {
-          const rows = await (db[table] as any).toArray()
-          for (const row of rows) {
-            localChanges.push({
-              id: `push:${entity}:${row.id}:${row.updatedAt}`,
-              entity,
-              op: 'upsert',
-              data: { ...row },
-              updatedAt: row.updatedAt ?? Date.now()
-            })
-          }
-        }
-        const { accepted } = await api.push(token, localChanges)
-        this.lastSyncAt = Date.now()
-        this.lastSyncCount = accepted
       } finally {
         this.syncing = false
       }
+    },
+
+    /**
+     * 已登录状态下手动同步：push 本地变更（云端自动存快照）
+     */
+    async syncNow(): Promise<void> {
+      if (!this.account) throw new Error('请先登录')
+      const changes = await this.collectLocalChanges()
+      const { accepted } = await this.pushOnly(this.account.token, changes.map((i) => i.change))
+      this.lastSyncAt = Date.now()
+      this.lastSyncCount = accepted
     }
   }
 })

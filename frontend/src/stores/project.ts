@@ -150,11 +150,15 @@ export const useProjectStore = defineStore('project', {
     // ---- 笔记操作 ----
     async addNote(title: string, content = '') {
       if (!this.currentProjectId) return
+      // v1.1: 新笔记默认继承所在项目的可见性
+      const proj = this.projects.find((p) => p.id === this.currentProjectId)
+      const vis = (proj?.visibility ?? 'private') as 'public' | 'private'
       const note = await createNote({
         projectId: this.currentProjectId,
         folderId: this.currentFolderId,
         title,
-        content
+        content,
+        visibility: vis
       })
       await this.loadTree()
       await this.loadEntries()

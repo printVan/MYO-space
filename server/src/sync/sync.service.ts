@@ -61,6 +61,10 @@ export class SyncService implements OnModuleDestroy {
           [change.id, userId, change.entity, change.op, data, change.updatedAt],
         );
         accepted += res.rowCount ?? 0;
+        // v1.1: note upsert 成功后自动存云端快照
+        if (res.rowCount && change.entity === 'note' && change.op === 'upsert' && change.data) {
+          await this.saveSnapshotPg(userId, change.data as Record<string, unknown>);
+        }
       }
       return { accepted };
     }
@@ -83,9 +87,60 @@ export class SyncService implements OnModuleDestroy {
       seen.add(change.id);
       list.push(change);
       accepted++;
+      // v1.1: 内存模式也存快照
+      if (change.entity === 'note' && change.op === 'upsert' && change.data) {
+        this.saveSnapshotMemory(userId, change.data);
+      }
     }
     list.sort((a, b) => a.updatedAt - b.updatedAt);
     return { accepted };
+  }
+
+  /** v1.1: 云端快照——note upsert 时自动存一份 */
+  private async saveSnapshotPg(userId: string, note: Record<string, unknown>): Promise<void> {
+    const noteId = String(note.id ?? '');
+    const content = String(note.content ?? '');
+    if (!noteId) return;
+    const id = 'cs_' + userId + '_' + noteId + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    await this.db.query(
+      `INSERT INTO cloud_snapshots (id, user_id, note_id, content, message, created_at)
+       VALUES ($1, $2, $3, $4, NULL, $5)`,
+      [id, userId, noteId, content, Date.now()],
+    );
+  }
+
+  /** 内存模式快照存储 */
+  private memSnapshots = new Map<string, { id: string; noteId: string; content: string; message: string | null; createdAt: number }[]>();
+  private saveSnapshotMemory(userId: string, note: Record<string, unknown>): void {
+    const noteId = String(note.id ?? '');
+    const content = String(note.content ?? '');
+    if (!noteId) return;
+    const list = this.memSnapshots.get(userId) ?? [];
+    list.push({
+      id: 'cs_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      noteId,
+      content,
+      message: null,
+      createdAt: Date.now(),
+    });
+    this.memSnapshots.set(userId, list);
+  }
+
+  /** v1.1: 列出某笔记的云端历史版本（倒序，最多 50 条） */
+  async listCloudSnapshots(userId: string, noteId: string): Promise<{ id: string; content: string; message: string | null; createdAt: number }[]> {
+    if (this.usePg) {
+      const res = await this.db.query<{ id: string; content: string; message: string | null; created_at: number }>(
+        `SELECT id, content, message, created_at AS "createdAt"
+         FROM cloud_snapshots
+         WHERE user_id = $1 AND note_id = $2
+         ORDER BY created_at DESC
+         LIMIT 50`,
+        [userId, noteId],
+      );
+      return res.rows.map((r) => ({ id: r.id, content: r.content, message: r.message, createdAt: Number(r.created_at) }));
+    }
+    const list = this.memSnapshots.get(userId) ?? [];
+    return list.filter((s) => s.noteId === noteId).sort((a, b) => b.createdAt - a.createdAt).slice(0, 50);
   }
 
   /** 拉取自 since 时间戳以来的全部变更 */

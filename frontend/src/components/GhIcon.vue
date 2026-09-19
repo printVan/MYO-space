@@ -13,8 +13,9 @@ const props = withDefaults(
   defineProps<{
     name: string
     size?: number
+    color?: string
   }>(),
-  { size: 16 }
+  { size: 16, color: '' }
 )
 
 const ICONS: Record<string, string> = {
@@ -26,6 +27,14 @@ const ICONS: Record<string, string> = {
   // 项目 / 目录
   repo: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M12 8h5"/><path d="M8.5 13a1.5 1.5 0 1 0 0-3"/>',
   folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  // Lucide 风格：项目看板 / 项目卡片
+  board: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>',
+  // Lucide 风格：列表树
+  listTree: '<path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M3 6v4a1 1 0 0 0 1 1h4"/><path d="M3 10v4a1 1 0 0 0 1 1h4"/><path d="M3 14v4a1 1 0 0 0 1 1h4"/>',
+  // Lucide 风格：单个文件/笔记
+  note: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  // Lucide 风格：公文包
+  briefcase: '<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>',
   // 笔记文件
   file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
   fileText: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
@@ -33,6 +42,7 @@ const ICONS: Record<string, string> = {
   chevronRight: '<path d="m9 18 6-6-6-6"/>',
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
   chevronLeft: '<path d="m15 18-6-6 6-6"/>',
+  chevronUp: '<path d="m18 15-6-6-6 6"/>',
   // 方框+笔（进入工作区）
   penSquare: '<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>',
   // 公告板（公开博客）
@@ -48,13 +58,32 @@ const ICONS: Record<string, string> = {
   // 移动端 / 桌面端视图
   smartphone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
   monitor: '<rect width="20" height="14" x="2" y="3" rx="2" ry="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+  // 收起侧栏（GitHub 风格：竖线+箭头）
+  sidebarCollapse: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/><path d="m10 9-3 3 3 3"/>',
+  // 展开侧栏
+  sidebarExpand: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/>',
+  // 收起工具栏（向上箭头）
+  toolbarCollapse: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 14l5-5 5 5"/>',
+  // 展开工具栏（向下箭头）
+  toolbarExpand: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 10l5 5 5-5"/>',
+  // 公开仓库
+  repoPublic: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M12 8h5"/><path d="M8.5 13a1.5 1.5 0 1 0 0-3"/><circle cx="17" cy="17" r="3"/>',
+  // 私密仓库
+  repoPrivate: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M12 8h5"/><path d="M8.5 13a1.5 1.5 0 1 0 0-3"/><rect x="14.5" y="15" width="6" height="5" rx="1"/><path d="M16 15v-2a2 2 0 0 1 4 0v2"/>',
   // 关闭
-  close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'
+  close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  // 加号
+  plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  // 下载/导出
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+  // 小圆点（项目标记）
+  dot: '<circle cx="12" cy="12" r="3"/>',
 }
 
 const svg = computed(() => {
   const body = ICONS[props.name] || ICONS.file
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:100%;height:100%">${body}</svg>`
+  const stroke = props.color || 'currentColor'
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:100%;height:100%">${body}</svg>`
 })
 </script>
 

@@ -4,6 +4,7 @@ import { useThemeStore } from '@/stores/theme'
 import { usePreferenceStore } from '@/stores/preference'
 import { useProjectStore } from '@/stores/project'
 import { useAccountStore } from '@/stores/account'
+import { ensureDefaultProjects } from '@/services/projects'
 import './app.scss'
 
 const pinia = createPinia()
@@ -19,6 +20,7 @@ const App = createApp({
       await prefStore.init()
       await themeStore.init()
       await accountStore.init()
+      await ensureDefaultProjects()
       await projectStore.init()
     })()
     return {}

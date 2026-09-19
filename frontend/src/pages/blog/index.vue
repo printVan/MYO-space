@@ -110,7 +110,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import Taro from '@tarojs/taro'
+import Taro, { useLoad } from '@tarojs/taro'
 import { listProjects } from '@/services/projects'
 import { countProjectNotes } from '@/services/notes'
 import { globalSearch } from '@/services/search'
@@ -196,6 +196,13 @@ function goWorkspace() {
 function goHome() {
   Taro.reLaunch({ url: '/pages/blog/index' })
 }
+
+useLoad((options) => {
+  if (options?.kw) {
+    keyword.value = decodeURIComponent(options.kw)
+    onSearchInput({ detail: { value: keyword.value } } as any)
+  }
+})
 
 onMounted(() => {
   load()
@@ -479,16 +486,16 @@ let autoMobileOff: (() => void) | null = null
   }
 
   .gh-header {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 8px;
     padding: 10px 12px;
   }
 
   .header-search {
-    order: 10;
-    width: 100%;
-    max-width: none;
-    margin-left: 0;
+    flex: 1;
+    max-width: 320px;
+    margin-left: 12px;
+    order: 0;
   }
 
   .workspace-link {

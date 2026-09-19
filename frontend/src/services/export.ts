@@ -95,68 +95,7 @@ export async function exportNotePdf(note: Note): Promise<void> {
   }
 }
 
-/** 导出项目 Git 仓库 zip（§4.4.4 / §4.7）：
- * 动态按需加载 isomorphic-git + lightning-fs，内存临时组装标准 Git 仓库 zip；
- * Git 包只导出各笔记最新版本，不导出产品内部快照历史 */
-export async function exportGitZip(projectId: string): Promise<void> {
-  const [{ default: JSZip }, git, LightningFS] = await Promise.all([
-    import('jszip'),
-    import('isomorphic-git'),
-    import('@isomorphic-git/lightning-fs')
-  ])
-  const project = await db.projects.get(projectId)
-  if (!project) throw new Error('项目不存在')
-
-  const items = await exportProjectNotes(projectId)
-  const root = `/repo-${projectId}`
-  const fs = new LightningFS.default(`repo-tmp-${projectId}-${Date.now()}`)
-  const pfs = fs.promises
-
-  // 写入全部文件（保持目录结构；lightning-fs mkdir 不支持 recursive，需逐级创建）
-  const mkdirp = async (dir: string) => {
-    const parts = dir.split('/').filter(Boolean)
-    let cur = ''
-    for (const p of parts) {
-      cur += `/${p}`
-      try {
-        await pfs.mkdir(cur)
-      } catch { /* 目录已存在 */ }
-    }
-  }
-  for (const { note, path } of items) {
-    const full = `${root}/${path}`
-    const dir = full.slice(0, full.lastIndexOf('/'))
-    await mkdirp(dir)
-    await pfs.writeFile(full, note.content)
-  }
-  await pfs.writeFile(`${root}/README.md`, `# ${project.name}\n\n${project.description}\n`)
-
-  const author = { name: 'myblog', email: 'myblog@local.dev' }
-  await git.init({ fs, dir: root, defaultBranch: 'main' })
-  await git.add({ fs, dir: root, filepath: '.' })
-  await git.commit({ fs, dir: root, message: `init: ${project.name}`, author })
-
-  // 遍历内存目录组装 zip
-  const zip = new JSZip()
-  const walk = async (dir: string, zipDir: string) => {
-    const entries = await pfs.readdir(dir)
-    for (const entry of entries) {
-      if (entry === '.git') continue
-      const full = `${dir}/${entry}`
-      const stat = await pfs.stat(full)
-      if (stat.type === 'file') {
-        const content = await pfs.readFile(full)
-        zip.file(`${zipDir}/${entry}`.replace(/^\//, ''), content)
-      } else {
-        const childZip = zip.folder(`${zipDir}/${entry}`.replace(/^\//, ''))
-        await walk(full, `${zipDir}/${entry}`.replace(/^\//, ''))
-      }
-    }
-  }
-  await walk(root, '')
-  const blob = await zip.generateAsync({ type: 'blob' })
-  triggerDownload(blob, `${safeName(project.name)}-git.zip`, 'application/zip')
-}
+/** 导出项目 Git 仓库 zip 功能已移除（v1.1 精简）：普通用户只需 Markdown/HTML 打包，不再依赖 isomorphic-git + lightning-fs */
 
 function buildPageHtml(title: string, content: string, projectName?: string): string {
   const md = content || ''

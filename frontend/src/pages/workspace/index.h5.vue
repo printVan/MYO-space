@@ -15,7 +15,7 @@
           @input="onSearchInput"
         />
       </view>
-      <AppHeaderActions show-blog-link />
+      <AppHeaderActions :show-blog-link="false" />
     </view>
 
     <!-- 全局搜索结果下拉 -->
@@ -315,7 +315,7 @@ import { useEditorStore } from '@/stores/editor'
 import { useThemeStore } from '@/stores/theme'
 import { usePreferenceStore } from '@/stores/preference'
 import { globalSearch, type SearchResult } from '@/services/search'
-import { exportNoteMd, exportNoteHtml, exportNotePdf, exportProjectMdZip, exportProjectHtmlZip, exportGitZip } from '@/services/export'
+import { exportNoteMd, exportNoteHtml, exportNotePdf, exportProjectMdZip, exportProjectHtmlZip } from '@/services/export'
 import { formatTime, relativeTimeStr } from '@/utils/time'
 import { message } from '@/utils/feedback'
 import type { FileEntry, TreeItem } from '@/services/folders'
@@ -598,16 +598,17 @@ function openSnapshotPanel() {
 function showExportMenu() {
   if (!projectStore.currentProjectId) return
   Taro.showActionSheet({
-    itemList: ['导出全部 Markdown（zip）', '导出静态 HTML 站点（zip）', '导出 Git 仓库 zip'],
+    itemList: ['导出全部 Markdown（zip）', '导出静态 HTML 站点（zip）'],
     success: (res) => {
-      const actions = [exportProjectMdZip, exportProjectHtmlZip, exportGitZip]
+      const actions = [exportProjectMdZip, exportProjectHtmlZip]
       const fn = actions[res.tapIndex]
       if (fn) {
         fn(projectStore.currentProjectId)
           .then(() => message.success('导出完成'))
-          .catch((e) => message.error(`导出失败：${e.message}`))
+          .catch((e) => message.error(`导出失败：${e?.message || JSON.stringify(e)}`))
       }
-    }
+    },
+    fail: () => { /* 用户取消，静默 */ }
   })
 }
 
@@ -624,7 +625,8 @@ function showNoteExportMenu() {
           .then(() => message.success('PDF 导出完成'))
           .catch((e) => message.error(`PDF 导出失败：${e.message}`))
       }
-    }
+    },
+    fail: () => { /* 用户取消，静默 */ }
   })
 }
 

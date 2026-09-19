@@ -1,11 +1,22 @@
 <template>
   <view class="settings-page">
     <view class="gh-header">
-      <view class="brand">
+      <view class="brand" @click="goHome">
         <BrandIcon :size="26" />
         <text class="brand-name">MYO Space</text>
       </view>
-      <view class="gh-link workspace-link" @click="goWorkspace" title="工作台"><GhIcon name="penSquare" :size="18" /></view>
+      <view class="header-search">
+        <input
+          class="gh-input search-input"
+          :value="keyword"
+          placeholder="搜索项目 / 公开笔记…"
+          @input="onSearchInput"
+          @keyup.enter="goSearch"
+        />
+      </view>
+      <view class="gh-link workspace-link" @click="goWorkspace" title="工作台">
+        <GhIcon name="penSquare" :size="18" />
+      </view>
       <AppHeaderActions ref="headerActions" :show-blog-link="false" />
     </view>
 
@@ -117,8 +128,19 @@ function onAccountAction() {
   headerActions.value?.openAccountModal()
 }
 
+const keyword = ref('')
+function onSearchInput(e: any) {
+  keyword.value = e.detail?.value ?? ''
+}
+function goSearch() {
+  Taro.reLaunch({ url: `/pages/blog/index?kw=${encodeURIComponent(keyword.value)}` })
+}
 function goWorkspace() {
   Taro.reLaunch({ url: '/pages/workspace/index' })
+}
+
+function goHome() {
+  Taro.reLaunch({ url: '/pages/blog/index' })
 }
 
 function onClear() {
@@ -166,11 +188,20 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
 }
 .brand-name {
   font-weight: 700;
   font-size: 15px;
   color: var(--header-text);
+}
+.header-search {
+  flex: 1;
+  max-width: 420px;
+  margin-left: 16px;
+}
+.search-input {
+  height: 30px;
 }
 .workspace-link {
   display: flex;
@@ -178,6 +209,7 @@ onUnmounted(() => {
   padding: 4px;
   border-radius: 6px;
   transition: background 0.15s;
+  cursor: pointer;
 }
 .workspace-link:hover {
   background: rgba(255, 255, 255, 0.08);

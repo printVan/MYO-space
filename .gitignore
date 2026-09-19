@@ -22,6 +22,10 @@ server/uploads/
 docs/
 qa-results/
 
+# 本地启动脚本（个人环境，不入库）
+scripts/
+*.bat
+
 # 敏感凭据（绝不入库）
 server/.env
 .env

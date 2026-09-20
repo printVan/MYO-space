@@ -82,14 +82,15 @@ export const useAccountStore = defineStore('account', {
     },
 
     /**
-     * 收集本地所有 upsert 变更（v1.1: 不含 snapshots，因为废弃）
-     * 用于同步弹窗展示文件级 diff
+     * 收集本地未同步的变更（v1.1: 不含 snapshots，因为废弃）
+     * 只 push synced !== true 的行，已同步的不再重复推。
      */
     async collectLocalChanges(): Promise<DiffItem[]> {
       const items: DiffItem[] = []
       for (const [entity, table] of Object.entries(TABLE_MAP) as [SyncEntity, SyncTable][]) {
         const rows = await (db[table] as any).toArray()
         for (const row of rows) {
+          if (row.synced === true) continue
           const updatedAt = row.updatedAt ?? Date.now()
           items.push({
             change: {

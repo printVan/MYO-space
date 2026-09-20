@@ -154,6 +154,8 @@ async function onAuth() {
     try {
       await accountStore.syncNow()
       message.success('已同步本地数据到云端')
+      // 同步完成后整页刷新，让用户直接看到云端数据，不用手动 F5
+      setTimeout(() => window.location.reload(), 600)
     } catch (e: any) {
       message.warning(`已登录，但同步失败：${e.message}`)
     }
@@ -170,6 +172,8 @@ async function onSync() {
   try {
     await accountStore.syncNow()
     message.success(`同步完成（${accountStore.lastSyncCount} 条）`)
+    // 同步完成后整页刷新，让用户直接看到云端数据
+    setTimeout(() => window.location.reload(), 600)
   } catch (e: any) {
     message.error(`同步失败：${e.message}`)
   }

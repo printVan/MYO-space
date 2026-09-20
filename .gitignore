@@ -44,3 +44,5 @@ desktop.ini
 *.bak
 *~
 *.tsbuildinfo
+*.ps1
+seed-test-data.js

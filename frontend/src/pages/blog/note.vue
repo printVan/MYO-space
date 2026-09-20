@@ -74,6 +74,7 @@ onMounted(load)
 <style scoped lang="scss">
 .blog-page {
   min-height: 100vh;
+  background: var(--bg);
 }
 .header-title {
   font-weight: 600;
@@ -105,7 +106,7 @@ onMounted(load)
   font-weight: 600;
   line-height: 1.3;
   margin-bottom: 8px;
-  color: #1f2328;
+  color: var(--text);
 }
 .note-meta {
   display: flex;
@@ -122,7 +123,7 @@ onMounted(load)
 }
 .meta-item {
   font-size: 12px;
-  color: #59636e;
+  color: var(--text-secondary);
 }
 .note-body {
   min-height: 200px;

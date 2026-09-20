@@ -37,7 +37,7 @@ const html = computed(() => renderMarkdown(props.source))
 [data-theme="dark"] .markdown-body.md-preview h5,
 [data-theme="dark"] .markdown-body.md-preview h6 {
   color: #e3ede7 !important;
-  background: transparent !important;
+  background: var(--bg) !important;
 }
 .markdown-body.md-preview {
   --fgColor-default: var(--text) !important;

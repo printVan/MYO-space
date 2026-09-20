@@ -2,7 +2,7 @@
   "name": "myblog-frontend",
   "version": "1.0.0",
   "private": true,
-  "description": "MYO Space 个人笔记博客 - Taro 多端前端",
+  "description": "MYO Space 个人空间/团队协作空间 - Taro 多端前端",
   "scripts": {
     "dev:h5": "taro build --type h5 --watch",
     "build:h5": "taro build --type h5",

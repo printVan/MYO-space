@@ -133,7 +133,7 @@ function buildIndexHtml(project: { name: string; description: string } | undefin
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(project?.name ?? '博客')}</title>
+<title>${escapeHtml(project?.name ?? '空间')}</title>
 <style>
 body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; max-width: 900px; margin: 0 auto; padding: 32px 24px; color: #24292f; }
 a { color: #0969da; text-decoration: none; }
@@ -142,7 +142,7 @@ ul { line-height: 1.9; }
 </style>
 </head>
 <body>
-<h1>${escapeHtml(project?.name ?? '博客')}</h1>
+<h1>${escapeHtml(project?.name ?? '空间')}</h1>
 <p>${escapeHtml(project?.description ?? '')}</p>
 <ul>${list}</ul>
 </body>

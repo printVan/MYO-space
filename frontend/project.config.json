@@ -1,7 +1,7 @@
 {
   "miniprogramRoot": "dist/",
   "projectname": "myblog-frontend",
-  "description": "GitHub 风格个人笔记博客",
+  "description": "个人空间/团队协作空间",
   "appid": "touristappid",
   "setting": {
     "urlCheck": true,

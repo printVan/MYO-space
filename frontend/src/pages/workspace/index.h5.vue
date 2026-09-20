@@ -442,6 +442,14 @@ async function onSelectTreeNode(item: TreeItem) {
 
 // ---- 笔记打开 ----
 async function openNote(noteId: string) {
+  // 权限拦截：未登录 + 已同步 + 私密文件 -> 不允许打开
+  if (!accountStore.account) {
+    const meta = await getNote(noteId)
+    if (meta && meta.synced && meta.visibility === 'private') {
+      Taro.showToast({ title: '该文件为私密文件，请登录后查看', icon: 'none', duration: 2200 })
+      return
+    }
+  }
   await editorStore.openNote(noteId)
   projectStore.openNote(noteId)
   snapshotOpen.value = false

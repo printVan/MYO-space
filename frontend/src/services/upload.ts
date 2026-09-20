@@ -38,5 +38,10 @@ export async function uploadImage(file: File | Blob, filename: string, token: st
   }
   const data = (await res.json()) as UploadResult
   if (!data?.url) throw new Error(data?.error || '上传失败')
+  // 本地模式后端返回相对路径（/uploads/images/xxx.png），前端与后端不同源（dev: 10086 vs 3000），
+  // 直接插入 Markdown 会指向前端域名导致 404。拼成完整 origin URL；生产模式（S3）返回完整 https:// 不动。
+  if (data.url.startsWith('/')) {
+    return new URL(BASE).origin + data.url
+  }
   return data.url
 }

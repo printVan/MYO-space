@@ -231,6 +231,23 @@
       </view>
     </view>
 
+    <!-- 通用确认弹窗（可带密码输入） -->
+    <view v-if="modal === 'confirmBox'" class="modal-mask" @click.self="closeModal">
+      <view class="modal">
+        <view class="modal-title">{{ confirmBox.title }}</view>
+        <view class="modal-desc">{{ confirmBox.desc }}</view>
+        <view class="modal-field" v-if="confirmBox.needPw">
+          <text class="modal-label">访问密码</text>
+          <input class="gh-input" type="password" v-model="confirmBox.password" placeholder="请输入密码" />
+          <view v-if="confirmBox.error" class="pw-error">{{ confirmBox.error }}</view>
+        </view>
+        <view class="modal-actions">
+          <view class="gh-btn" @click="closeModal">取消</view>
+          <view class="gh-btn primary" @click="onConfirmBoxOk">继续</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 移动端抽屉遮罩（自动/手动移动模式下显示） -->
     <view v-if="activeDrawer !== 'none'" class="m-mask" @click="activeDrawer = 'none'"></view>
 
@@ -381,6 +398,15 @@ function goSettings() {
 
 // 弹窗
 const modal = ref('')
+// 通用确认弹窗（可带密码输入）：替代原生 Taro.showModal，复用 .modal 卡通字体
+const confirmBox = ref<{
+  title: string
+  desc: string
+  needPw: boolean
+  password: string
+  error: string
+  onConfirm: ((pwd?: string) => boolean | void | Promise<boolean | void>) | null
+}>({ title: '', desc: '', needPw: false, password: '', error: '', onConfirm: null })
 const newProject = ref({ name: '', description: '', visibility: 'private' as 'public' | 'private', password: '', topics: '' })
 const newNoteTitle = ref('')
 const newFolderName = ref('')
@@ -485,6 +511,25 @@ function openNewFolderModal() {
 }
 
 function closeModal() { modal.value = '' }
+
+function openConfirm(opts: {
+  title: string
+  desc: string
+  needPw?: boolean
+  onConfirm: (pwd?: string) => boolean | void | Promise<boolean | void>
+}) {
+  confirmBox.value = { title: opts.title, desc: opts.desc, needPw: !!opts.needPw, password: '', error: '', onConfirm: opts.onConfirm }
+  modal.value = 'confirmBox'
+}
+
+async function onConfirmBoxOk() {
+  const cb = confirmBox.value
+  if (!cb.onConfirm) return
+  const r = await cb.onConfirm(cb.password)
+  if (r === false) return // 业务失败（如密码错误），留在弹窗
+  modal.value = ''
+  confirmBox.value.onConfirm = null
+}
 
 async function confirmNewProject() {
   const name = newProject.value.name.trim()
@@ -599,47 +644,38 @@ async function toggleVisibility() {
   if (!currentNote.value) return
   const n = currentNote.value
   if (n.visibility === 'private') {
-    // 私密 → 公开：弹窗确认
-    const confirmed = await Taro.showModal({
+    // 私密 → 公开：确认弹窗（已同步则需密码）
+    openConfirm({
       title: '设为公开',
-      content: '该文件将移动到"我的公开空间"，所有人可访问。',
-      confirmText: '继续',
-      cancelText: '取消'
-    })
-    if (!confirmed.confirm) return
-    // 已同步的文件（synced=true）需密码；纯本地新建（synced=false）直接操作
-    if (n.synced) {
-      const pwd = await Taro.showModal({
-        title: '输入密码确认',
-        editable: true,
-        placeholderText: '请输入密码',
-        confirmText: '确认',
-        cancelText: '取消'
-      })
-      if (!pwd.confirm) return
-      const proj = await getProject(n.projectId)
-      if (proj?.password && pwd.content !== proj.password) {
-        message.error('密码错误')
-        return
+      desc: '该文件将移动到“我的公开空间”，所有人可访问。',
+      needPw: !!n.synced,
+      onConfirm: async (pwd?: string) => {
+        if (n.synced) {
+          const proj = await getProject(n.projectId)
+          if (proj?.password && pwd !== proj.password) {
+            confirmBox.value.error = '密码错误'
+            return false
+          }
+        }
+        await makeNotePublic(n.id)
+        await projectStore.loadTree()
+        message.success('已设为公开')
       }
-    }
-    await makeNotePublic(n.id)
-    await projectStore.loadTree()
-    message.success('已设为公开')
-  } else {
-    // 公开 → 私密：弹窗确认
-    const confirmed = await Taro.showModal({
-      title: '设为私密',
-      content: '该文件将移动到"我的私密空间"，不再对访客展示。',
-      confirmText: '继续',
-      cancelText: '取消'
     })
-    if (!confirmed.confirm) return
-    await makeNotePrivate(n.id)
-    await editorStore.closeNote()
-    await projectStore.refreshProjects()
-    await projectStore.loadTree()
-    Taro.showToast({ title: '已设为私密', icon: 'success' })
+  } else {
+    // 公开 → 私密：确认弹窗
+    openConfirm({
+      title: '设为私密',
+      desc: '该文件将移动到“我的私密空间”，不再对访客展示。',
+      needPw: false,
+      onConfirm: async () => {
+        await makeNotePrivate(n.id)
+        await editorStore.closeNote()
+        await projectStore.refreshProjects()
+        await projectStore.loadTree()
+        message.success('已设为私密')
+      }
+    })
   }
 }
 
@@ -1341,6 +1377,17 @@ onBeforeUnmount(() => {
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 16px;
+}
+.modal-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+.pw-error {
+  font-size: 12px;
+  color: var(--danger);
+  margin-top: 6px;
 }
 .modal-field {
   margin-bottom: 12px;

@@ -105,6 +105,8 @@ import FileTree from '@/components/FileTree'
 import GhIcon from '@/components/GhIcon'
 import { bindAutoMobile } from '@/utils/mobile'
 import { db } from '@/db'
+import { useAccountStore } from '@/stores/account'
+const accountStore = useAccountStore()
 
 /**
  * 公开项目页（§4.6.2）
@@ -191,7 +193,8 @@ async function loadEntries() {
     }
     const note = await getNote(e.id)
     // 公开可看；未同步私密也可看（本地作者）；已同步私密对外隐藏
-    if (note && (note.visibility === 'public' || !note.synced)) result.push(e)
+    const canView = accountStore.account || note.visibility === 'public' || !note.synced
+    if (note && canView) result.push(e)
   }
   entries.value = result
 }
@@ -231,10 +234,14 @@ function onToggle(id: string) {
 }
 
 async function onSelect(item: TreeItem) {
-  if (item.kind !== 'note') return
+  if (item.kind !== 'note') {
+    await enterFolder(item.id)
+    activeId.value = item.id
+    return
+  }
   const note = await getNote(item.id)
   // 已同步私密对外隐藏，未同步私密可看
-  if (note && note.visibility !== 'public' && note.synced) {
+  if (note && !accountStore.account && note.visibility !== 'public' && note.synced) {
     Taro.showToast({ title: '该笔记为私密笔记', icon: 'none' })
     return
   }
@@ -259,7 +266,7 @@ async function onEntryClick(e: FileEntry) {
     await enterFolder(e.id)
   } else {
     const note = await getNote(e.id)
-    if (note && note.visibility !== 'public' && note.synced) {
+    if (note && !accountStore.account && note.visibility !== 'public' && note.synced) {
       Taro.showToast({ title: '该笔记为私密笔记', icon: 'none' })
       return
     }

@@ -36,7 +36,7 @@ export async function deleteAnnotation(id: string): Promise<void> {
 
 /** 补充条目手动排序（§4.3.3） */
 export async function reorderAnnotations(noteId: string, orderedIds: string[]): Promise<void> {
-  await db.transaction('rw', db.annotations, async () => {
+  await db.transaction('rw', [db.annotations], async () => {
     let order = 1
     for (const id of orderedIds) {
       await db.annotations.update(id, { order })

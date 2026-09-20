@@ -61,6 +61,7 @@
               <GhIcon name="briefcase" :size="13" color="#2d6a4f" />
             </text>
             <text class="project-name-item">{{ p.name }}</text>
+            <GhIcon v-if="p.visibility !== 'public'" name="lock" :size="11" color="#656d76" />
           </view>
         </scroll-view>
         <view class="panel-header tree-title">
@@ -77,7 +78,8 @@
         <scroll-view class="tree-area" scroll-y>
           <FileTree
             :items="projectStore.tree"
-            :active-id="projectStore.currentNoteId"
+            :active-note-id="projectStore.currentNoteId"
+            :active-folder-id="projectStore.currentFolderId"
             :expanded-ids="expandedIds"
             @toggle="onToggleTreeNode"
             @select="onSelectTreeNode"
@@ -99,7 +101,6 @@
               <view class="gh-btn sm" @click="openRenameModal">重命名</view>
               <view class="gh-btn sm" @click="togglePin">{{ currentNote.pinned ? '取消置顶' : '置顶' }}</view>
               <view class="gh-btn sm" @click="toggleVisibility">{{ currentNote.visibility === 'public' ? '设为私密' : '设为公开' }}</view>
-              <view class="gh-btn sm" @click="openMoveMenu">移动</view>
               <view class="gh-btn sm" @click="openSnapshotPanel">版本快照</view>
               <view class="gh-btn sm" @click="showNoteExportMenu">导出</view>
               <view class="gh-btn sm editor-max-btn" :title="editorMaximized ? '还原' : '最大化'" @click="editorMaximized = !editorMaximized">
@@ -254,7 +255,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import Taro from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { useProjectStore } from '@/stores/project'
 import { useEditorStore } from '@/stores/editor'
 import { useThemeStore } from '@/stores/theme'
@@ -403,7 +404,13 @@ function onToggleTreeNode(id: string) {
 }
 
 async function onSelectTreeNode(item: TreeItem) {
-  if (item.kind !== 'note') return
+  if (item.kind === 'folder') {
+    // 点击文件夹：选中它，后续新建笔记/文件夹都在这个文件夹下
+    await projectStore.enterFolder(item.id)
+    return
+  }
+  // 点击笔记：清空文件夹选中，文件夹高亮消失
+  await projectStore.enterFolder(null)
   await openNote(item.id)
 }
 
@@ -583,6 +590,8 @@ async function togglePin() {
   if (!currentNote.value) return
   const next = !currentNote.value.pinned
   await projectStore.togglePin(currentNote.value.id, next)
+  // 同步更新当前打开的笔记状态，按钮文字立即变化
+  currentNote.value.pinned = next
   message.success(next ? '已置顶' : '已取消置顶')
 }
 
@@ -791,6 +800,11 @@ onMounted(async () => {
       /* 默认项目未就绪时忽略 */
     }
   }
+})
+
+// 每次显示页面时刷新项目列表（从项目管理页删除/新增项目后回到工作区能看到最新）
+useDidShow(() => {
+  projectStore.loadProjects()
 })
 
 let mobileOff: (() => void) | null = null
@@ -1109,6 +1123,14 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   position: relative;
 }
+.unsynced-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9a6700;
+  background: #fff8c5;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
 .toolbar-actions {
   display: flex;
   gap: 6px;
@@ -1168,6 +1190,7 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   overflow: auto;
+  background: var(--bg);
 }
 .divider-vertical {
   width: 6px;
@@ -1294,6 +1317,7 @@ onBeforeUnmount(() => {
 .modal {
   width: 400px;
   max-width: 90vw;
+  font-family: "Comic Sans MS", "Comic Sans", cursive;
   /* 弹框固定浅色（白底深字），不随主题变深 */
   --bg: #ffffff;
   --bg-subtle: #f6f8fa;

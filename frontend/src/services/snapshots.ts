@@ -33,7 +33,7 @@ export async function createSnapshot(
     message: message?.trim() ? message.trim() : autoSnapshotMessage(content),
     createdAt: Date.now()
   }
-  await db.transaction('rw', db.snapshots, async () => {
+  await db.transaction('rw', [db.snapshots], async () => {
     await db.snapshots.add(snapshot)
     // 淘汰最早快照
     const count = await db.snapshots.where('[noteId+kind]').equals([noteId, kind]).count()

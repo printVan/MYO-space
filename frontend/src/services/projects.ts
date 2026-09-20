@@ -87,7 +87,7 @@ export async function deleteProject(id: string): Promise<void> {
   if (isDefaultProject(id)) {
     throw new Error('默认项目不可删除')
   }
-  await db.transaction('rw', db.projects, db.folders, db.notes, db.snapshots, db.annotations, async () => {
+  await db.transaction('rw', [db.projects, db.folders, db.notes, db.snapshots, db.annotations], async () => {
     await db.projects.delete(id)
     await db.folders.where('projectId').equals(id).delete()
     const noteIds = await db.notes.where('projectId').equals(id).primaryKeys()

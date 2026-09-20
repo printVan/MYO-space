@@ -10,6 +10,7 @@
           <GhIcon :name="iconOf(item)" :size="13" />
         </text>
         <text class="node-name">{{ item.name }}</text>
+        <text v-if="!item.synced" class="unsynced-dot" title="未同步"></text>
       </view>
       <view
         v-if="item.kind === 'folder' && props.expandedIds.includes(item.id) && item.children.length"
@@ -17,7 +18,8 @@
       >
         <FileTree
           :items="item.children"
-          :active-id="props.activeId"
+          :active-note-id="props.activeNoteId"
+          :active-folder-id="props.activeFolderId"
           :expanded-ids="props.expandedIds"
           @select="(it) => emit('select', it)"
           @toggle="(id) => emit('toggle', id)"
@@ -40,7 +42,8 @@ defineOptions({ name: 'FileTree' })
  */
 const props = defineProps<{
   items: TreeItem[]
-  activeId?: string
+  activeNoteId?: string
+  activeFolderId?: string
   expandedIds: string[]
 }>()
 
@@ -50,19 +53,20 @@ const emit = defineEmits<{
 }>()
 
 function iconOf(item: TreeItem): string {
-  if (item.kind === 'folder') {
-    return props.expandedIds.includes(item.id) ? 'chevronDown' : 'chevronRight'
-  }
+  if (item.kind === 'folder') return 'folder'
   return 'fileText'
 }
 
 function isActive(item: TreeItem): boolean {
-  return item.kind === 'note' && item.id === props.activeId
+  if (item.kind === 'note') return item.id === props.activeNoteId
+  return item.id === props.activeFolderId
 }
 
 function onClick(item: TreeItem) {
   if (item.kind === 'folder') {
+    // 点击文件夹：展开/折叠 + 选中（后续新建文件创建在此文件夹下）
     emit('toggle', item.id)
+    emit('select', item)
   } else {
     emit('select', item)
   }
@@ -104,6 +108,15 @@ function onClick(item: TreeItem) {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text);
+}
+.unsynced-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d29922;
+  display: inline-block;
+  margin-left: 6px;
+  flex-shrink: 0;
 }
 .node-children {
   padding-left: 16px;

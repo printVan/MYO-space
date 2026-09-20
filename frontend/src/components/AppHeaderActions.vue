@@ -13,7 +13,7 @@
     <!-- 账号入口：未登录显示登录，已登录显示头像 -->
     <view class="account-entry" @click="openAccountModal">
       <template v-if="!accountStore.isLoggedIn">
-        <BrandIcon :size="18" variant="flat" color="#ffffff" />
+        <BrandIcon :size="18" variant="flat" color="currentColor" />
         <text class="account-text">登录</text>
       </template>
       <template v-else>

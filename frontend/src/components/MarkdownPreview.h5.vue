@@ -24,3 +24,39 @@ const html = computed(() => renderMarkdown(props.source))
   overflow-wrap: break-word;
 }
 </style>
+
+<style lang="scss">
+[data-theme="dark"] .markdown-body.md-preview,
+[data-theme="dark"] .markdown-body.md-preview *,
+[data-theme="dark"] .markdown-body.md-preview p,
+[data-theme="dark"] .markdown-body.md-preview li,
+[data-theme="dark"] .markdown-body.md-preview h1,
+[data-theme="dark"] .markdown-body.md-preview h2,
+[data-theme="dark"] .markdown-body.md-preview h3,
+[data-theme="dark"] .markdown-body.md-preview h4,
+[data-theme="dark"] .markdown-body.md-preview h5,
+[data-theme="dark"] .markdown-body.md-preview h6 {
+  color: #e3ede7 !important;
+  background: transparent !important;
+}
+.markdown-body.md-preview {
+  --fgColor-default: var(--text) !important;
+  --fgColor-muted: var(--text-secondary) !important;
+  --fgColor-accent: var(--accent) !important;
+  --bgColor-default: var(--bg) !important;
+  background: var(--bg) !important;
+}
+.markdown-body.md-preview a {
+  color: var(--accent) !important;
+}
+.markdown-body.md-preview code {
+  background: var(--code-bg) !important;
+  color: var(--text) !important;
+}
+.markdown-body.md-preview pre {
+  background: var(--code-bg) !important;
+}
+.markdown-body.md-preview blockquote {
+  color: var(--text-secondary) !important;
+}
+</style>

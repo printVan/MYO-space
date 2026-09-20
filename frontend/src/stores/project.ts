@@ -74,6 +74,10 @@ export const useProjectStore = defineStore('project', {
       await this.loadEntries()
     },
 
+    async loadProjects() {
+      this.projects = await listProjects()
+    },
+
     async loadTree() {
       if (!this.currentProjectId) return
       this.tree = await buildProjectTree(this.currentProjectId)
@@ -174,6 +178,7 @@ export const useProjectStore = defineStore('project', {
 
     async togglePin(id: string, pinned: boolean) {
       await updateNoteMeta(id, { pinned })
+      await this.loadTree()
       await this.loadEntries()
     },
 

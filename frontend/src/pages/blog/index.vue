@@ -51,9 +51,11 @@
           <view class="recent-name-row">
             <view class="recent-name">{{ n.title || '未命名' }}</view>
             <text v-if="n.pinned" class="pinned-badge">置顶</text>
+            <text v-if="!n.synced" class="unsynced-dot" title="未同步"></text>
+            <text v-if="n.visibility === 'private'" class="lock-badge" title="私密">🔒</text>
           </view>
           <view class="recent-excerpt">{{ excerpt(n.content) }}</view>
-          <view class="recent-meta">{{ relativeTimeStr(n.updatedAt) }} · {{ projectName(n.projectId) }}</view>
+          <view class="recent-meta">{{ relativeTimeStr(n.updatedAt) }} · {{ projectName(n.projectId) }}/{{ folderName(n.folderId) }}</view>
         </view>
       </view>
 
@@ -83,6 +85,7 @@ import BrandIcon from '@/components/BrandIcon'
 import GhIcon from '@/components/GhIcon'
 import { isMobileMode, onMobileChange, bindAutoMobile } from '@/utils/mobile'
 import { useAccountStore } from '@/stores/account'
+import { db } from '@/db'
 import { DEFAULT_PRIVATE_PROJECT_ID as DEFAULT_PROJECT_ID } from '@/services/projects'
 
 const PAGE_SIZE = 10
@@ -90,6 +93,7 @@ const MAX_NOTES = 50
 
 const allNotes = ref<Note[]>([])
 const projectsMap = ref<Record<string, Project>>({})
+const foldersMap = ref<Record<string, string>>({})
 const keyword = ref('')
 const searchResults = ref<Awaited<ReturnType<typeof globalSearch>>>([])
 const page = ref(1)
@@ -106,14 +110,24 @@ function projectName(pid: string): string {
   return projectsMap.value[pid]?.name ?? '未分类'
 }
 
+function folderName(fid: string | null): string {
+  if (!fid) return ''
+  return foldersMap.value[fid] ?? ''
+}
+
 function excerpt(content: string): string {
   const text = (content || '').replace(/[#*`>\-\[\]()!]/g, '').replace(/\s+/g, ' ').trim()
   return text.slice(0, 80) || '（空）'
 }
 
 async function load() {
-  const [projects, notes] = await Promise.all([listProjects(), listRecentNotes(MAX_NOTES)])
+  const [projects, notes, folders] = await Promise.all([
+    listProjects(),
+    listRecentNotes(MAX_NOTES),
+    db.folders.toArray()
+  ])
   projectsMap.value = Object.fromEntries(projects.map((p) => [p.id, p]))
+  foldersMap.value = Object.fromEntries(folders.map((f) => [f.id, f.name]))
   allNotes.value = notes
 }
 
@@ -255,6 +269,18 @@ let autoMobileOff: (() => void) | null = null
   padding: 2px 8px;
   border-radius: 4px;
   letter-spacing: 0.5px;
+}
+.lock-badge {
+  font-size: 12px;
+  opacity: 0.6;
+}
+.unsynced-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d29922;
+  display: inline-block;
+  flex-shrink: 0;
 }
 .recent-excerpt {
   font-size: 13px;

@@ -150,6 +150,15 @@ export const useAccountStore = defineStore('account', {
       if (!this.account) throw new Error('请先登录')
       const changes = await this.collectLocalChanges()
       const { accepted } = await this.pushOnly(this.account.token, changes.map((i) => i.change))
+      // push 成功后，把本地所有数据标记为已同步
+      for (const table of Object.values(TABLE_MAP) as SyncTable[]) {
+        const rows = await (db[table] as any).toArray()
+        for (const row of rows) {
+          if (!row.synced) {
+            await (db[table] as any).put({ ...row, synced: true })
+          }
+        }
+      }
       this.lastSyncAt = Date.now()
       this.lastSyncCount = accepted
     }

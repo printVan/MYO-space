@@ -59,7 +59,7 @@ export async function moveNote(id: string, folderId: string | null): Promise<voi
 
 /** 删除笔记（级联删除快照与补充区） */
 export async function deleteNote(id: string): Promise<void> {
-  await db.transaction('rw', db.notes, db.snapshots, db.annotations, async () => {
+  await db.transaction('rw', [db.notes, db.snapshots, db.annotations], async () => {
     await db.notes.delete(id)
     await db.snapshots.where('noteId').equals(id).delete()
     await db.annotations.where('noteId').equals(id).delete()
@@ -79,8 +79,13 @@ export async function countProjectNotes(projectId: string): Promise<number> {
 
 /** v1.1: 首页近期文件——按更新时间倒序取最近 N 条 */
 export async function listRecentNotes(limit = 50): Promise<Note[]> {
-  const all = await db.notes.orderBy('updatedAt').reverse().limit(limit).toArray()
-  return all
+  const all = await db.notes.orderBy('updatedAt').reverse().toArray()
+  // 置顶优先，再按更新时间
+  all.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+    return b.updatedAt - a.updatedAt
+  })
+  return all.slice(0, limit)
 }
 
 /** v1.1: 跨项目移动笔记（同属性项目间，直接改 projectId/folderId） */

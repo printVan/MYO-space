@@ -1,8 +1,8 @@
 <template>
   <view class="pm-page">
     <view class="gh-header">
-      <view class="gh-link" @click="goBack">← 返回</view>
-      <text class="header-title">项目管理</text>
+      <GhIcon name="arrowLeftCircle" :size="22" color="var(--header-text)" class="back-icon" @click="goBack" />
+      <GhIcon name="home" :size="18" color="var(--header-text)" class="home-icon" @click="goHome" />
     </view>
 
     <view class="pm-body">
@@ -24,6 +24,7 @@
             <view class="card-top">
               <GhIcon name="briefcase" :size="16" color="#2d6a4f" />
               <text class="card-name">{{ p.name }}</text>
+              <text v-if="!p.synced" class="unsynced-dot" title="未同步"></text>
               <view class="visibility-badge public">公开</view>
             </view>
             <view class="card-desc">{{ p.description || '暂无描述' }}</view>
@@ -58,6 +59,7 @@
             <view class="card-top">
               <GhIcon name="briefcase" :size="16" color="#656d76" />
               <text class="card-name">{{ p.name }}</text>
+              <text v-if="!p.synced" class="unsynced-dot" title="未同步"></text>
               <view class="visibility-badge private">私密</view>
             </view>
             <view class="card-desc">{{ p.description || '暂无描述' }}</view>
@@ -106,7 +108,18 @@ import { listProjects, updateProject, deleteProject, isDefaultProject } from '@/
 import { db } from '@/db'
 import type { Project } from '@/types/models'
 import GhIcon from '@/components/GhIcon'
+import BrandIcon from '@/components/BrandIcon'
+import AppHeaderActions from '@/components/AppHeaderActions'
 import { bindAutoMobile } from '@/utils/mobile'
+
+const keyword = ref('')
+const headerActions = ref<any>(null)
+function onSearchInput(e: any) {
+  keyword.value = e.detail?.value ?? ''
+}
+function goSearch() {
+  Taro.reLaunch({ url: `/pages/blog/index?kw=${encodeURIComponent(keyword.value)}` })
+}
 
 /**
  * 项目管理页（v1.1 S4）
@@ -153,16 +166,22 @@ function formatTime(ts: number) {
 function goBack() {
   Taro.navigateBack()
 }
+function goHome() {
+  Taro.reLaunch({ url: '/pages/blog/index' })
+}
 
 function openProject(p: Project) {
   Taro.navigateTo({ url: `/pages/blog/project?id=${p.id}` })
 }
 
 function openMakePublic(p: Project) {
+  const needPw = !!p.synced
   modal.value = {
     title: '转为公开',
-    desc: `项目「${p.name}」下的所有内容将对访客可见。请输入密码确认。`,
-    needPassword: true,
+    desc: needPw
+      ? `项目「${p.name}」下的所有内容将对访客可见。请输入密码确认。`
+      : `项目「${p.name}」下的所有内容将对访客可见。`,
+    needPassword: needPw,
     action: 'makePublic',
     project: p
   }
@@ -180,10 +199,14 @@ function openMakePrivate(p: Project) {
 }
 
 function openDelete(p: Project) {
+  // 未同步项目不需要密码，已同步项目才需要
+  const needPw = !!p.synced
   modal.value = {
     title: '删除项目',
-    desc: `删除项目「${p.name}」将一并删除其中所有文件，此操作不可恢复。请输入密码确认。`,
-    needPassword: true,
+    desc: needPw
+      ? `删除项目「${p.name}」将一并删除其中所有文件，此操作不可恢复。请输入密码确认。`
+      : `删除项目「${p.name}」将一并删除其中所有文件，此操作不可恢复。`,
+    needPassword: needPw,
     action: 'delete',
     project: p
   }
@@ -239,17 +262,30 @@ onMounted(() => {
   background: var(--bg, #fff);
   color: var(--fg, #24292f);
 }
-.gh-header {
+.brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border, #d0d7de);
-  background: var(--bg, #fff);
+  gap: 8px;
+  cursor: pointer;
 }
-.header-title {
+.brand-name {
+  font-weight: 700;
   font-size: 16px;
-  font-weight: 600;
+  color: var(--header-text);
+}
+.header-search {
+  flex: 1;
+  max-width: 400px;
+  margin: 0 auto;
+}
+.search-input {
+  width: 100%;
+}
+.back-icon, .home-icon {
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  &:hover { background: var(--bg-hover, rgba(0,0,0,0.06)); }
 }
 .gh-link {
   color: #0969da;
@@ -294,11 +330,12 @@ onMounted(() => {
   border: 1px solid var(--border, #d0d7de);
   border-radius: 8px;
   padding: 14px;
-  background: var(--card-bg, #fff);
+  background: #fff;
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: all 0.15s;
   &:hover {
-    border-color: #0969da;
+    border-color: var(--accent, #2d6a4f);
+    background: var(--accent-muted, rgba(45,106,79,0.08));
   }
 }
 .card-top {
@@ -311,6 +348,14 @@ onMounted(() => {
   font-weight: 600;
   font-size: 14px;
   flex: 1;
+}
+.unsynced-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d29922;
+  display: inline-block;
+  flex-shrink: 0;
 }
 .visibility-badge {
   font-size: 11px;

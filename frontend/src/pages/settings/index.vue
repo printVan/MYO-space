@@ -167,7 +167,14 @@ function onAccountAction() {
 const keyword = ref('')
 function onSearchInput(e: any) {
   keyword.value = e.detail?.value ?? ''
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    if (keyword.value.trim()) {
+      goSearch()
+    }
+  }, 500)
 }
+let searchTimer: any = null
 function goSearch() {
   Taro.reLaunch({ url: `/pages/blog/index?kw=${encodeURIComponent(keyword.value)}` })
 }

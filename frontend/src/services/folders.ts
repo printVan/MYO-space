@@ -50,7 +50,7 @@ export async function deleteFolder(id: string): Promise<void> {
   const allFolders = await db.folders.where('projectId').equals(folder.projectId).toArray()
   const descIds = collectDescendantIds(id, allFolders)
   const folderIds = [id, ...descIds]
-  await db.transaction('rw', db.folders, db.notes, db.snapshots, db.annotations, async () => {
+  await db.transaction('rw', [db.folders, db.notes, db.snapshots, db.annotations], async () => {
     await db.folders.bulkDelete(folderIds)
     const noteIds = await db.notes.where('folderId').anyOf(folderIds).primaryKeys()
     await db.notes.where('folderId').anyOf(folderIds).delete()
@@ -100,11 +100,7 @@ export async function listFolderEntries(projectId: string, folderId: string | nu
     return b.updatedAt - a.updatedAt
   })
   const entries: FileEntry[] = []
-  for (const f of folders) {
-    const childNotes = await db.notes.where('folderId').equals(f.id).count()
-    const childFolders = await db.folders.where('parentId').equals(f.id).count()
-    entries.push({ kind: 'folder', id: f.id, name: f.name, meta: { noteCount: childNotes + childFolders } })
-  }
+  // 先排文件：置顶优先
   for (const n of notes) {
     entries.push({
       kind: 'note',
@@ -112,6 +108,12 @@ export async function listFolderEntries(projectId: string, folderId: string | nu
       name: n.title.endsWith('.md') ? n.title : `${n.title}.md`,
       meta: { updatedAt: n.updatedAt, pinned: n.pinned, summary: summarizeContent(n.content) }
     })
+  }
+  // 再排文件夹
+  for (const f of folders) {
+    const childNotes = await db.notes.where('folderId').equals(f.id).count()
+    const childFolders = await db.folders.where('parentId').equals(f.id).count()
+    entries.push({ kind: 'folder', id: f.id, name: f.name, meta: { noteCount: childNotes + childFolders } })
   }
   return entries
 }
@@ -122,6 +124,7 @@ export interface TreeItem {
   name: string
   kind: 'folder' | 'note'
   children: TreeItem[]
+  synced?: boolean
 }
 
 export async function buildProjectTree(projectId: string): Promise<TreeItem[]> {
@@ -141,10 +144,7 @@ export async function buildProjectTree(projectId: string): Promise<TreeItem[]> {
   }
   const buildFolder = (parentId: string | null): TreeItem[] => {
     const result: TreeItem[] = []
-    const subs = (folderChildren.get(parentId) ?? []).slice().sort((a, b) => a.name.localeCompare(b.name))
-    for (const f of subs) {
-      result.push({ id: f.id, name: f.name, kind: 'folder', children: buildFolder(f.id) })
-    }
+    // 先排文件：置顶优先，再按更新时间
     const ns = (notesByFolder.get(parentId) ?? []).slice().sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
       return b.updatedAt - a.updatedAt
@@ -154,8 +154,14 @@ export async function buildProjectTree(projectId: string): Promise<TreeItem[]> {
         id: n.id,
         name: n.title.endsWith('.md') ? n.title : `${n.title}.md`,
         kind: 'note',
-        children: []
+        children: [],
+        synced: n.synced
       })
+    }
+    // 再排文件夹
+    const subs = (folderChildren.get(parentId) ?? []).slice().sort((a, b) => a.name.localeCompare(b.name))
+    for (const f of subs) {
+      result.push({ id: f.id, name: f.name, kind: 'folder', children: buildFolder(f.id), synced: f.synced })
     }
     return result
   }

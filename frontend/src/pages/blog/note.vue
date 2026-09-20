@@ -1,11 +1,8 @@
 <template>
   <view class="blog-page">
     <view class="gh-header">
-      <view class="gh-link" @click="goBack">← 返回</view>
-      <text class="header-title">{{ note?.title ?? '笔记' }}</text>
-      <view class="header-right">
-        <view v-if="note" class="gh-btn sm" @click="editNote">编辑</view>
-      </view>
+      <GhIcon name="arrowLeftCircle" :size="22" color="var(--header-text)" class="back-icon" @click="goBack" />
+      <GhIcon name="home" :size="18" color="var(--header-text)" class="home-icon" @click="goHome" />
     </view>
 
     <view v-if="note" class="note-container">
@@ -14,6 +11,7 @@
         <view class="note-meta">
           <text v-for="t in note.topics" :key="t" class="gh-tag">{{ t }}</text>
           <text class="meta-item">更新于 {{ relativeTimeStr(note.updatedAt) }}</text>
+          <GhIcon v-if="note" name="edit" :size="16" color="var(--header-text)" class="edit-icon" @click="editNote" />
         </view>
       </view>
       <view class="note-body">
@@ -34,6 +32,8 @@ import type { Note } from '@/types/models'
 import { relativeTimeStr } from '@/utils/time'
 import MarkdownPreview from '@/components/MarkdownPreview'
 import AnnotationSection from '@/components/AnnotationSection'
+import GhIcon from '@/components/GhIcon'
+import { useAccountStore } from '@/stores/account'
 
 /**
  * 公开笔记页（§4.6.3）
@@ -45,15 +45,21 @@ const note = ref<Note | null>(null)
 
 async function load() {
   const n = await getNote(noteId)
-  if (n && n.visibility === 'public') {
-    note.value = n
-  } else {
-    note.value = null
-  }
+  if (!n) { note.value = null; return }
+  // 公开文件直接看
+  if (n.visibility === 'public') { note.value = n; return }
+  // 私密文件：已登录可看，未登录但未同步（纯本地）也可看
+  const account = useAccountStore().account
+  if (account || !n.synced) { note.value = n; return }
+  note.value = null
 }
 
 function goBack() {
   Taro.navigateBack()
+}
+
+function goHome() {
+  Taro.reLaunch({ url: '/pages/blog/index' })
 }
 
 /** 跳转工作区编辑该笔记（本地优先：公开页数据即本地数据） */
@@ -74,7 +80,15 @@ onMounted(load)
   font-size: 15px;
 }
 .header-right {
-  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.back-icon, .home-icon {
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  &:hover { background: var(--bg-hover, rgba(0,0,0,0.06)); }
 }
 .note-container {
   max-width: 880px;
@@ -91,6 +105,7 @@ onMounted(load)
   font-weight: 600;
   line-height: 1.3;
   margin-bottom: 8px;
+  color: #1f2328;
 }
 .note-meta {
   display: flex;
@@ -98,9 +113,16 @@ onMounted(load)
   gap: 8px;
   flex-wrap: wrap;
 }
+.edit-icon {
+  margin-left: auto;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  &:hover { background: var(--bg-hover, rgba(0,0,0,0.06)); }
+}
 .meta-item {
   font-size: 12px;
-  color: var(--text-muted);
+  color: #59636e;
 }
 .note-body {
   min-height: 200px;
